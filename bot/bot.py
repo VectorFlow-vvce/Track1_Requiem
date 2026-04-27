@@ -6,9 +6,9 @@ from telegram import Update
 from telegram.ext import ApplicationBuilder, ContextTypes, CommandHandler, MessageHandler, filters
 from dotenv import load_dotenv
 
-from ai_processor import extract_expense_details, transcribe_voice, extract_from_receipt, generate_insights
+from ai_processor import extract_expense_details, transcribe_voice, extract_from_receipt, generate_insights, generate_summary_insight
 from categorizer import get_category
-from utils import save_expense, generate_pie_chart, load_expenses
+from utils import save_expense, generate_pie_chart, load_expenses, build_summary_stats
 
 load_dotenv()
 TOKEN = os.getenv("TELEGRAM_BOT_TOKEN")
@@ -100,14 +100,23 @@ async def handle_image(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
 async def summary(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await context.bot.send_chat_action(chat_id=update.effective_message.chat_id, action="upload_photo")
-    
+    user_id = update.effective_user.id
+    expenses = load_expenses().get(str(user_id), [])
+    if not expenses:
+        await update.message.reply_text("📉 No data yet! Log some expenses first to see your summary.")
+        return
+
     chart_path = generate_pie_chart(update.effective_user.id)
     if chart_path and os.path.exists(chart_path):
-        await update.message.reply_photo(
-            photo=open(chart_path, 'rb'), 
-            caption="📊 **Your Financial Snapshot**\nHere is your spending breakdown by category.",
-            parse_mode='Markdown'
-        )
+        stats = build_summary_stats(expenses)
+        advice = generate_summary_insight(stats)
+        with open(chart_path, 'rb') as chart_file:
+            await update.message.reply_photo(
+                photo=chart_file,
+                caption="📊 **Your Financial Snapshot**",
+                parse_mode='Markdown'
+            )
+        await update.message.reply_text(f"🧠 **AI Summary**\n\n{advice}", parse_mode='Markdown')
     else:
         await update.message.reply_text("📉 No data yet! Log some expenses first to see your summary.")
 

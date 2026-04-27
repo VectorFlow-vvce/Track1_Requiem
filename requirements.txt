@@ -7,3 +7,6 @@ plotly
 matplotlib
 python-dotenv
 plaid-python
+transformers
+torch
+safetensors

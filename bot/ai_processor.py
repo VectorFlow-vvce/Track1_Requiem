@@ -73,3 +73,45 @@ def generate_insights(expenses):
     except Exception as e:
         print(f"Error generating insights: {e}")
         return "Could not generate insights at this time."
+
+
+def generate_summary_insight(summary_stats):
+    try:
+        category_lines = "\n".join(
+            f"- {category}: {amount}"
+            for category, amount in list(summary_stats.get("category_totals", {}).items())[:6]
+        )
+        recent_lines = "\n".join(
+            f"- {expense.get('amount')} on {expense.get('category')} ({expense.get('description')})"
+            for expense in summary_stats.get("recent_expenses", [])[:5]
+        )
+        prompt = f"""
+        Write a concise financial summary for a Telegram expense bot user.
+        Keep it under 900 characters. Use INR/Rs wording.
+        Include:
+        1. One sentence on overall spending.
+        2. The biggest category or risk.
+        3. One practical next action.
+
+        Total spend: {summary_stats.get("total_spend")}
+        Transactions: {summary_stats.get("transaction_count")}
+        Average spend: {summary_stats.get("average_spend")}
+        Top category: {summary_stats.get("top_category")}
+        Category totals:
+        {category_lines}
+        Recent expenses:
+        {recent_lines}
+        """
+        response = client.chat.completions.create(
+            model=MODEL,
+            messages=[{"role": "user", "content": prompt}]
+        )
+        return response.choices[0].message.content.strip()
+    except Exception as e:
+        print(f"Error generating summary insight: {e}")
+        return (
+            f"You spent Rs {summary_stats.get('total_spend', 0):,.0f} across "
+            f"{summary_stats.get('transaction_count', 0)} transactions. "
+            f"Your top category is {summary_stats.get('top_category', 'None')}. "
+            "Review the largest category first for quick savings."
+        )
