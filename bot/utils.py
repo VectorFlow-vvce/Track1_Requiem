@@ -6,6 +6,43 @@ import pandas as pd
 from matplotlib.ticker import FuncFormatter
 
 DATA_FILE = os.path.join(os.path.dirname(__file__), '../data/expenses.json')
+BUDGETS_FILE = os.path.join(os.path.dirname(__file__), '../data/budgets.json')
+GAMIFICATION_FILE = os.path.join(os.path.dirname(__file__), '../data/gamification.json')
+REMINDERS_FILE = os.path.join(os.path.dirname(__file__), '../data/reminders.json')
+LANG_FILE = os.path.join(os.path.dirname(__file__), '../data/languages.json')
+FORECAST_PERIODS = 7
+
+SUPPORTED_LANGUAGES = {
+    "en": "English",
+    "hi": "हिन्दी (Hindi)",
+    "ml": "മലയാളം (Malayalam)",
+    "ta": "தமிழ் (Tamil)",
+    "te": "తెలుగు (Telugu)",
+    "kn": "ಕನ್ನಡ (Kannada)",
+}
+DEFAULT_LANGUAGE = "en"
+
+
+def load_languages():
+    if not os.path.exists(LANG_FILE):
+        return {}
+    with open(LANG_FILE, 'r') as f:
+        try:
+            return json.load(f)
+        except json.JSONDecodeError:
+            return {}
+
+
+def get_user_language(user_id):
+    return load_languages().get(str(user_id), DEFAULT_LANGUAGE)
+
+
+def set_user_language(user_id, lang_code):
+    data = load_languages()
+    data[str(user_id)] = lang_code
+    os.makedirs(os.path.dirname(LANG_FILE), exist_ok=True)
+    with open(LANG_FILE, 'w') as f:
+        json.dump(data, f, indent=4)
 
 def load_expenses():
     if not os.path.exists(DATA_FILE):
@@ -16,22 +53,104 @@ def load_expenses():
         except json.JSONDecodeError:
             return {}
 
-def save_expense(user_id, amount, category, description, source="text"):
+def save_expense(user_id, amount, category, description, source="text", metadata=None):
     data = load_expenses()
     user_key = str(user_id)
     if user_key not in data:
         data[user_key] = []
-    
-    data[user_key].append({
+
+    expense = {
         "amount": amount,
         "category": category,
         "description": description,
         "source": source,
         "timestamp": datetime.now().isoformat()
-    })
+    }
+    if metadata:
+        expense.update(metadata)
+
+    data[user_key].append(expense)
     
     with open(DATA_FILE, 'w') as f:
         json.dump(data, f, indent=4)
+    
+    # Update gamification
+    update_gamification(user_id)
+
+
+def _empty_forecast(method="insufficient_data"):
+    return {
+        "method": method,
+        "daily": [],
+        "next_7_days_total": 0,
+        "average_daily_forecast": 0,
+    }
+
+
+def _forecast_with_statsmodels(series, periods):
+    from statsmodels.tsa.arima.model import ARIMA
+
+    # A compact ARIMA(1,1,1) handles short personal-spend histories without
+    # requiring seasonal data or a long training window.
+    model = ARIMA(series.astype(float), order=(1, 1, 1), enforce_stationarity=False, enforce_invertibility=False)
+    fitted = model.fit()
+    forecast = fitted.forecast(steps=periods)
+    return [max(0, round(float(value), 2)) for value in forecast]
+
+
+def _forecast_with_trend_fallback(series, periods):
+    values = [float(value) for value in series.tolist()]
+    if len(values) < 2:
+        return [max(0, round(values[0], 2))] * periods if values else []
+
+    recent_window = values[-min(7, len(values)):]
+    recent_average = sum(recent_window) / len(recent_window)
+    deltas = [values[index] - values[index - 1] for index in range(1, len(values))]
+    recent_deltas = deltas[-min(5, len(deltas)):]
+    trend = sum(recent_deltas) / len(recent_deltas) if recent_deltas else 0
+    trend = max(min(trend, recent_average * 0.35), -recent_average * 0.35)
+
+    return [
+        max(0, round(recent_average + trend * (step + 1), 2))
+        for step in range(periods)
+    ]
+
+
+def build_spend_forecast(daily_totals, periods=FORECAST_PERIODS):
+    if not daily_totals:
+        return _empty_forecast()
+
+    series = pd.Series(daily_totals, dtype="float64")
+    series.index = pd.to_datetime(series.index, errors="coerce")
+    series = series[series.index.notna()].sort_index()
+    if series.empty:
+        return _empty_forecast()
+
+    full_index = pd.date_range(series.index.min(), series.index.max(), freq="D")
+    series = series.reindex(full_index, fill_value=0).astype(float)
+    if len(series) < 3:
+        return _empty_forecast()
+
+    method = "arima"
+    try:
+        forecast_values = _forecast_with_statsmodels(series, periods)
+    except Exception:
+        method = "advanced_arima_fallback"
+        forecast_values = _forecast_with_trend_fallback(series, periods)
+
+    start_date = series.index.max() + pd.Timedelta(days=1)
+    forecast_dates = pd.date_range(start_date, periods=periods, freq="D")
+    daily = [
+        {"date": date.date().isoformat(), "amount": amount}
+        for date, amount in zip(forecast_dates, forecast_values)
+    ]
+    total = round(sum(item["amount"] for item in daily), 2)
+    return {
+        "method": method,
+        "daily": daily,
+        "next_7_days_total": total,
+        "average_daily_forecast": round(total / len(daily), 2) if daily else 0,
+    }
 
 
 def build_summary_stats(expenses):
@@ -45,6 +164,7 @@ def build_summary_stats(expenses):
             "daily_totals": {},
             "largest_expense": None,
             "recent_expenses": [],
+            "forecast": _empty_forecast(),
         }
 
     normalized = []
@@ -77,6 +197,7 @@ def build_summary_stats(expenses):
         "daily_totals": daily_totals.to_dict(),
         "largest_expense": largest,
         "recent_expenses": recent,
+        "forecast": build_spend_forecast(daily_totals.to_dict()),
     }
 
 
@@ -188,3 +309,271 @@ def generate_pie_chart(user_id):
     fig.savefig(file_path, bbox_inches="tight", facecolor=fig.get_facecolor())
     plt.close(fig)
     return file_path
+
+
+def detect_subscriptions(user_id):
+    expenses = load_expenses().get(str(user_id), [])
+    if len(expenses) < 2:
+        return []
+    
+    df = pd.DataFrame(expenses)
+    df['timestamp'] = pd.to_datetime(df['timestamp'])
+    df['date'] = df['timestamp'].dt.date
+    df = df.sort_values('timestamp')
+    
+    subscriptions = []
+    seen = set()
+    
+    for desc in df['description'].unique():
+        desc_key = desc[:20].lower().strip()
+        if desc_key in seen:
+            continue
+        
+        matching = df[df['description'].str.lower().str.contains(desc_key[:15], regex=False)]
+        if len(matching) < 2:
+            continue
+        
+        amounts = matching['amount'].values
+        if len(amounts) < 2 or amounts.std() > amounts.mean() * 0.15:
+            continue
+        
+        dates = sorted(matching['date'].values)
+        if len(dates) < 2:
+            continue
+        
+        gaps = [(dates[i+1] - dates[i]).days for i in range(len(dates)-1)]
+        avg_gap = sum(gaps) / len(gaps)
+        
+        if 20 <= avg_gap <= 40:
+            seen.add(desc_key)
+            subscriptions.append({
+                'description': desc,
+                'amount': float(amounts.mean()),
+                'frequency_days': int(avg_gap),
+                'occurrences': len(matching),
+                'category': matching.iloc[0]['category']
+            })
+    
+    return sorted(subscriptions, key=lambda x: x['amount'], reverse=True)
+
+
+def load_budgets():
+    if not os.path.exists(BUDGETS_FILE):
+        return {}
+    with open(BUDGETS_FILE, 'r') as f:
+        try:
+            return json.load(f)
+        except json.JSONDecodeError:
+            return {}
+
+
+def save_budget(user_id, category, amount):
+    budgets = load_budgets()
+    user_key = str(user_id)
+    if user_key not in budgets:
+        budgets[user_key] = {}
+    budgets[user_key][category] = float(amount)
+    
+    os.makedirs(os.path.dirname(BUDGETS_FILE), exist_ok=True)
+    with open(BUDGETS_FILE, 'w') as f:
+        json.dump(budgets, f, indent=4)
+
+
+def check_budget_exceeded(user_id, category):
+    budgets = load_budgets().get(str(user_id), {})
+    if category not in budgets:
+        return None
+    
+    limit = budgets[category]
+    expenses = load_expenses().get(str(user_id), [])
+    
+    current_month = datetime.now().month
+    current_year = datetime.now().year
+    
+    month_total = sum(
+        e['amount'] for e in expenses
+        if e['category'] == category
+        and datetime.fromisoformat(e['timestamp']).month == current_month
+        and datetime.fromisoformat(e['timestamp']).year == current_year
+    )
+    
+    if month_total > limit:
+        return {
+            'category': category,
+            'spent': month_total,
+            'limit': limit,
+            'exceeded_by': month_total - limit,
+            'percentage': (month_total / limit) * 100
+        }
+    return None
+
+
+def generate_csv_export(user_id):
+    expenses = load_expenses().get(str(user_id), [])
+    if not expenses:
+        return None
+    
+    df = pd.DataFrame(expenses)
+    df['timestamp'] = pd.to_datetime(df['timestamp'])
+    df = df.sort_values('timestamp', ascending=False)
+    
+    os.makedirs("assets", exist_ok=True)
+    file_path = f"assets/{user_id}_expenses.csv"
+    df.to_csv(file_path, index=False)
+    return file_path
+
+
+def load_gamification():
+    if not os.path.exists(GAMIFICATION_FILE):
+        return {}
+    with open(GAMIFICATION_FILE, 'r') as f:
+        try:
+            return json.load(f)
+        except json.JSONDecodeError:
+            return {}
+
+
+def update_gamification(user_id):
+    data = load_gamification()
+    user_key = str(user_id)
+    
+    if user_key not in data:
+        data[user_key] = {
+            'streak': 0,
+            'last_log_date': None,
+            'total_logs': 0,
+            'badges': []
+        }
+    
+    user_data = data[user_key]
+    today = datetime.now().date().isoformat()
+    last_date = user_data.get('last_log_date')
+    
+    if last_date != today:
+        if last_date:
+            last = datetime.fromisoformat(last_date).date()
+            diff = (datetime.now().date() - last).days
+            if diff == 1:
+                user_data['streak'] += 1
+            elif diff > 1:
+                user_data['streak'] = 1
+        else:
+            user_data['streak'] = 1
+        
+        user_data['last_log_date'] = today
+    
+    user_data['total_logs'] += 1
+    
+    # Award badges
+    if user_data['streak'] >= 7 and '7-day-streak' not in user_data['badges']:
+        user_data['badges'].append('7-day-streak')
+    if user_data['total_logs'] >= 50 and '50-logs' not in user_data['badges']:
+        user_data['badges'].append('50-logs')
+    if user_data['total_logs'] >= 100 and '100-logs' not in user_data['badges']:
+        user_data['badges'].append('100-logs')
+    
+    os.makedirs(os.path.dirname(GAMIFICATION_FILE), exist_ok=True)
+    with open(GAMIFICATION_FILE, 'w') as f:
+        json.dump(data, f, indent=4)
+    
+    return user_data
+
+
+def get_gamification_stats(user_id):
+    data = load_gamification().get(str(user_id))
+    if not data:
+        return None
+    
+    expenses = load_expenses().get(str(user_id), [])
+    if len(expenses) < 2:
+        return data
+    
+    df = pd.DataFrame(expenses)
+    df['timestamp'] = pd.to_datetime(df['timestamp'])
+    
+    current_month = datetime.now().month
+    last_month = current_month - 1 if current_month > 1 else 12
+    
+    current_month_expenses = df[df['timestamp'].dt.month == current_month]
+    last_month_expenses = df[df['timestamp'].dt.month == last_month]
+    
+    current_total = current_month_expenses['amount'].sum()
+    last_total = last_month_expenses['amount'].sum()
+    
+    if last_total > 0:
+        change = ((current_total - last_total) / last_total) * 100
+        data['month_over_month_change'] = round(change, 1)
+    
+    return data
+
+
+def load_reminders():
+    if not os.path.exists(REMINDERS_FILE):
+        return {}
+    with open(REMINDERS_FILE, 'r') as f:
+        try:
+            return json.load(f)
+        except json.JSONDecodeError:
+            return {}
+
+
+def save_reminders(data):
+    os.makedirs(os.path.dirname(REMINDERS_FILE), exist_ok=True)
+    with open(REMINDERS_FILE, 'w') as f:
+        json.dump(data, f, indent=4)
+
+
+def toggle_reminders(user_id, chat_id):
+    data = load_reminders()
+    user_key = str(user_id)
+    if user_key in data:
+        del data[user_key]
+        save_reminders(data)
+        return False
+    data[user_key] = {"chat_id": chat_id, "enabled": True}
+    save_reminders(data)
+    return True
+
+
+def get_reminder_users():
+    return load_reminders()
+
+
+def user_logged_today(user_id):
+    expenses = load_expenses().get(str(user_id), [])
+    if not expenses:
+        return False
+    today = datetime.now().date().isoformat()
+    return any(e.get("timestamp", "").startswith(today) for e in expenses)
+
+
+def build_category_comparison(user_id):
+    """Build current vs previous month spending per category."""
+    expenses = load_expenses().get(str(user_id), [])
+    if not expenses:
+        return {}
+
+    now = datetime.now()
+    cur_month, cur_year = now.month, now.year
+    prev_month = cur_month - 1 if cur_month > 1 else 12
+    prev_year = cur_year if cur_month > 1 else cur_year - 1
+
+    stats = {}
+    for e in expenses:
+        ts = datetime.fromisoformat(e.get("timestamp", now.isoformat()))
+        cat = e.get("category", "Other")
+        amt = float(e.get("amount", 0))
+        if cat not in stats:
+            stats[cat] = {"current": 0, "previous": 0, "txn_count": 0}
+        if ts.month == cur_month and ts.year == cur_year:
+            stats[cat]["current"] += amt
+            stats[cat]["txn_count"] += 1
+        elif ts.month == prev_month and ts.year == prev_year:
+            stats[cat]["previous"] += amt
+
+    for info in stats.values():
+        prev = info["previous"]
+        cur = info["current"]
+        info["change"] = ((cur - prev) / prev * 100) if prev > 0 else (100 if cur > 0 else 0)
+
+    return dict(sorted(stats.items(), key=lambda x: x[1]["current"], reverse=True))

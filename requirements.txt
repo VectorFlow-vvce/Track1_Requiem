@@ -1,4 +1,4 @@
-python-telegram-bot
+python-telegram-bot[job-queue]
 openai
 requests
 streamlit
@@ -10,3 +10,4 @@ requests
 transformers
 torch
 safetensors
+statsmodels

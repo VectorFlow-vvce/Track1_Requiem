@@ -6,7 +6,7 @@ ROOT = Path(__file__).resolve().parents[1]
 BOT_DIR = ROOT / "bot"
 sys.path.insert(0, str(BOT_DIR))
 
-from utils import build_summary_stats
+from utils import build_summary_stats, build_spend_forecast
 
 
 class SummaryAnalyticsTests(unittest.TestCase):
@@ -48,6 +48,25 @@ class SummaryAnalyticsTests(unittest.TestCase):
         self.assertEqual(stats["transaction_count"], 0)
         self.assertEqual(stats["top_category"], "None")
         self.assertEqual(stats["category_totals"], {})
+        self.assertEqual(stats["forecast"]["method"], "insufficient_data")
+
+    def test_build_spend_forecast_returns_seven_future_days(self):
+        daily_totals = {
+            "2026-04-20": 500,
+            "2026-04-21": 650,
+            "2026-04-22": 700,
+            "2026-04-23": 850,
+            "2026-04-24": 900,
+            "2026-04-25": 1050,
+            "2026-04-26": 1200,
+        }
+
+        forecast = build_spend_forecast(daily_totals, periods=7)
+
+        self.assertEqual(len(forecast["daily"]), 7)
+        self.assertEqual(forecast["daily"][0]["date"], "2026-04-27")
+        self.assertGreater(forecast["next_7_days_total"], 0)
+        self.assertIn(forecast["method"], {"arima", "advanced_arima_fallback"})
 
 
 if __name__ == "__main__":
