@@ -1,25 +1,20 @@
-# 📊 FineHance Omni
-### *The Frictionless, Multimodal Financial Intelligence Ecosystem*
+
+<div align="center">
+
+# 🌌 FineHance Omni
+### The Frictionless, Multimodal Financial Intelligence Ecosystem
 
 [![GitHub License](https://img.shields.io/badge/license-Apache%202.0-blue.svg)](LICENSE)
 [![Python 3.10+](https://img.shields.io/badge/python-3.10+-blue.svg)](https://www.python.org/downloads/)
+[![React 18](https://img.shields.io/badge/React-18-61DAFB.svg?logo=react)](https://reactjs.org/)
+[![Vite](https://img.shields.io/badge/Vite-4-646CFF.svg?logo=vite)](https://vitejs.dev/)
 [![Custom ML Accuracy](https://img.shields.io/badge/ML--Accuracy-96.56%25-green.svg)](https://huggingface.co/CyberKunju/finehance-categorizer-minilm)
 
-**FineHance Omni** is an all-in-one financial assistant that turns the chore of expense tracking into a seamless conversation. By combining **Voice**, **Vision**, **Custom Transformers**, and **Setu Account Aggregator**, it captures every rupee of your spending with zero friction and provides professional-grade financial insights instantly.
+*FineHance Omni* is a next-generation financial assistant designed to completely eliminate the friction of expense tracking. By uniting *Voice Automation, **Receipt Vision, a **Custom Transformer Model, **Setu Open Banking, and a **Stunning Modern Web Dashboard*, it captures every rupee of your spending with zero effort and provides proactive, professional-grade financial insights.
 
----
+[Explore the Custom ML Model](https://huggingface.co/CyberKunju/finehance-categorizer-minilm) • [Report Bug](https://github.com/Dawn-Fighter/finehance-omni/issues) • [Request Feature](https://github.com/Dawn-Fighter/finehance-omni/issues)
 
-## 🌟 The Problem
-Most people stop tracking their finances because of **friction**. Opening an app, navigating menus, and typing "₹500 - Food" takes too long. Receipts get lost, voice notes are messy, and manual entry often misses bank-direct transactions (UPI/IMPS).
-
-## ✅ The Solution
-FineHance Omni removes the interface entirely. 
-- **Talk to it:** Just like a friend (English, Hindi, Malayalam, Tamil, etc.).
-- **Show it:** Snap a photo of a receipt.
-- **Sync it:** Securely connect your Indian bank accounts via **Setu**.
-- **See it:** Get professional analytics on your phone or a dedicated web dashboard.
-
----
+</div>
 
 ## 🚀 Key Features
 
