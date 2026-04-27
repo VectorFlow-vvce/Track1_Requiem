@@ -6,9 +6,9 @@ from telegram import Update
 from telegram.ext import ApplicationBuilder, ContextTypes, CommandHandler, MessageHandler, filters
 from dotenv import load_dotenv
 
-from ai_processor import extract_expense_details, transcribe_voice, extract_from_receipt
+from ai_processor import extract_expense_details, transcribe_voice, extract_from_receipt, generate_insights
 from categorizer import get_category
-from utils import save_expense, generate_pie_chart
+from utils import save_expense, generate_pie_chart, load_expenses
 
 load_dotenv()
 TOKEN = os.getenv("TELEGRAM_BOT_TOKEN")
@@ -27,7 +27,8 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
         "🎙️ Send a voice note (e.g., 'Spent 500 on dinner')\n"
         "👁️ Send a photo of a receipt\n"
         "💬 Type your expense\n\n"
-        "Try saying: 'I spent 300 on pizza today'"
+        "Try saying: 'I spent 300 on pizza today'",
+        parse_mode='Markdown'
     )
 
 async def handle_text(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -42,7 +43,10 @@ async def handle_text(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if details.get('amount', 0) > 0:
         category = get_category(details['description'])
         save_expense(update.effective_user.id, details['amount'], category, details['description'], source="text")
-        await update.message.reply_text(f"✅ Logged ₹{details['amount']} under **{category}**\n📝 *{details['description']}*")
+        await update.message.reply_text(
+            f"✅ Logged ₹{details['amount']} under **{category}**\n📝 *{details['description']}*",
+            parse_mode='Markdown'
+        )
     else:
         await update.message.reply_text("🤔 I couldn't catch the amount. Try saying something like 'Spent 500 on coffee'.")
 
@@ -66,7 +70,8 @@ async def handle_voice(update: Update, context: ContextTypes.DEFAULT_TYPE):
         save_expense(update.effective_user.id, details['amount'], category, details['description'], source="voice")
         await update.message.reply_text(
             f"🎙️ Heard: \"{text}\"\n"
-            f"✅ Logged ₹{details['amount']} under **{category}**"
+            f"✅ Logged ₹{details['amount']} under **{category}**",
+            parse_mode='Markdown'
         )
     else:
         await update.message.reply_text(f"🎙️ I heard: \"{text}\"\nBut I couldn't find an amount. Try again?")
@@ -87,7 +92,8 @@ async def handle_image(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await update.message.reply_text(
             f"👁️ Receipt Scanned!\n"
             f"✅ Logged ₹{details['amount']} under **{category}**\n"
-            f"📝 *{details['description']}*"
+            f"📝 *{details['description']}*",
+            parse_mode='Markdown'
         )
     else:
         await update.message.reply_text("❌ I couldn't extract the amount from this receipt. Make sure the total is clear.")
@@ -99,10 +105,34 @@ async def summary(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if chart_path and os.path.exists(chart_path):
         await update.message.reply_photo(
             photo=open(chart_path, 'rb'), 
-            caption="📊 **Your Financial Snapshot**\nHere is your spending breakdown by category."
+            caption="📊 **Your Financial Snapshot**\nHere is your spending breakdown by category.",
+            parse_mode='Markdown'
         )
     else:
         await update.message.reply_text("📉 No data yet! Log some expenses first to see your summary.")
+
+async def insights(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    user_id = update.effective_user.id
+    expenses = load_expenses().get(str(user_id), [])
+    
+    if len(expenses) < 3:
+        await update.message.reply_text("📉 I need at least 3 expenses to give you meaningful insights. Keep logging!")
+        return
+
+    await context.bot.send_chat_action(chat_id=update.effective_message.chat_id, action="typing")
+    
+    advice = generate_insights(expenses)
+    await update.message.reply_text(f"🧠 **AI Financial Insights**\n\n{advice}", parse_mode='Markdown')
+
+async def dashboard(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    # In a real app, this would be a hosted URL. For hackathon, we show local/placeholder.
+    await update.message.reply_text(
+        "🖥️ **Your Command Center**\n"
+        "View your full financial analytics here:\n"
+        "🔗 [Open Dashboard](http://localhost:8501)\n\n"
+        "*(Note: Ensure the dashboard is running locally during the demo)*",
+        parse_mode='Markdown'
+    )
 
 if __name__ == '__main__':
     if not TOKEN:
@@ -112,6 +142,8 @@ if __name__ == '__main__':
         
         application.add_handler(CommandHandler('start', start))
         application.add_handler(CommandHandler('summary', summary))
+        application.add_handler(CommandHandler('insights', insights))
+        application.add_handler(CommandHandler('dashboard', dashboard))
         application.add_handler(MessageHandler(filters.TEXT & (~filters.COMMAND), handle_text))
         application.add_handler(MessageHandler(filters.VOICE, handle_voice))
         application.add_handler(MessageHandler(filters.PHOTO, handle_image))
