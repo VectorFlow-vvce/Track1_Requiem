@@ -25,7 +25,7 @@ export function MonthlySummary() {
             <Sparkles size={16} className="text-indigo-500"/> Vivien's Executive Summary
           </h3>
           <div className="prose prose-sm prose-slate max-w-none text-slate-600">
-            <p>Overall, cash flow is looking extremely healthy this month. You have achieved a positive net cashflow of <strong>$5,657.50</strong>, driven by a large client payment from Acme Corp.</p>
+            <p>Overall, cash flow is looking extremely healthy this month. You have achieved a positive net cashflow of <strong>₹5,657.50</strong>, driven by a large client payment from Acme Corp.</p>
             <p>However, we noticed a sharp 40% increase in Infrastructure spending (AWS). This appears to be related to the new RDS instances spun up on the 14th.</p>
             <p><strong>Recommendation:</strong> Consider purchasing Reserved Instances if this database capacity is meant for long-term production use.</p>
           </div>
@@ -37,7 +37,7 @@ export function MonthlySummary() {
             <ul className="space-y-2 text-sm text-rose-800">
               <li className="flex gap-2">
                 <span className="font-bold shrink-0">•</span> 
-                <span>AWS Bill spiked by 40% ($350 increase).</span>
+                <span>AWS Bill spiked by 40% (₹350 increase).</span>
               </li>
               <li className="flex gap-2">
                 <span className="font-bold shrink-0">•</span> 

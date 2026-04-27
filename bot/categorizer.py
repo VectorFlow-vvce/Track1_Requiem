@@ -187,7 +187,7 @@ KEYWORD_CATEGORIES = (
     ("Insurance", ("insurance", "premium")),
     ("Cash & ATM", ("atm", "cash withdrawal", "withdrawal")),
     ("Transfers", ("transfer", "sent to", "upi", "bank transfer")),
-    ("Income", ("salary", "income", "received", "credited", "bonus")),
+    ("Income", ("salary", "income", "received", "credited", "bonus", "freelance", "reimbursement", "cashback", "refund")),
 )
 
 TFIDF_CATEGORY_DOCUMENTS = {
@@ -277,7 +277,7 @@ TFIDF_CATEGORY_DOCUMENTS = {
         "money transfer upi payment zerodha groww sip investment",
     ),
     "Income": (
-        "salary income received credited bonus reimbursement freelance payment",
+        "salary income received credited bonus reimbursement freelance payment cashback refund",
         "paycheck credited income freelance client payout",
     ),
 }
@@ -301,7 +301,7 @@ HIGH_SIGNAL_TFIDF_CATEGORIES = (
     ("Transportation", ("rapido", "ksrtc", "bmrtc", "metro", "bus", "auto", "namma yatri", "uber", "ola")),
     ("Travel", ("irctc", "flight", "airport", "hotel booking", "oyo", "airbnb")),
     ("Transfers", ("zerodha", "groww", "mutual fund", "sip", "upi", "bank transfer")),
-    ("Income", ("salary", "freelance", "paycheck", "credited", "bonus", "reimbursement")),
+    ("Income", ("salary", "freelance", "paycheck", "credited", "bonus", "reimbursement", "cashback", "refund")),
     ("Coffee & Beverages", ("chaya", "chai", "kaapi", "coffee", "juice", "pazham pori")),
     ("Restaurants", ("sapadu", "saapadu", "oonu", "mess", "mandi", "biryani", "parotta", "porotta", "hotel")),
 )

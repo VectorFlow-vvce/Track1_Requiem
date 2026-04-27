@@ -1,0 +1,28 @@
+{
+    "5814106682": [
+        {
+            "type": "lend",
+            "person": "Kashyap",
+            "amount": 50.0,
+            "note": "auto",
+            "timestamp": "2026-04-27T15:41:26.773528",
+            "settled": false
+        },
+        {
+            "type": "lend",
+            "person": "John",
+            "amount": 500.0,
+            "note": "dinner",
+            "timestamp": "2026-04-27T15:46:24.380539",
+            "settled": false
+        },
+        {
+            "type": "borrow",
+            "person": "Sarah",
+            "amount": 1000.0,
+            "note": "tickets",
+            "timestamp": "2026-04-27T15:46:24.380949",
+            "settled": false
+        }
+    ]
+}

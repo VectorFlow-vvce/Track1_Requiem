@@ -1,0 +1,20 @@
+{
+    "5814106682": {
+        "canara": {
+            "balance": 10000.0,
+            "type": "cash"
+        },
+        "cash": {
+            "balance": -94825.5,
+            "type": "cash"
+        },
+        "hdfc": {
+            "balance": 0,
+            "type": "cash"
+        },
+        "test_wallet": {
+            "balance": 100.0,
+            "type": "cash"
+        }
+    }
+}

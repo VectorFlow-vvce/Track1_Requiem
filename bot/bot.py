@@ -39,7 +39,17 @@ from utils import (
     set_user_language,
     build_category_comparison,
     check_duplicate,
+    filter_expenses_by_range,
+    check_spending_velocity,
+    edit_last_expense,
     SUPPORTED_LANGUAGES,
+    add_wallet,
+    get_wallets,
+    transfer_between_wallets,
+    add_ledger_entry,
+    get_outstanding_debts,
+    generate_pdf_report,
+    build_hierarchical_summary,
 )
 
 load_dotenv()
@@ -55,10 +65,18 @@ BOT_COMMANDS = [
     BotCommand("help", "Show what I can do"),
     BotCommand("language", "Change bot language"),
     BotCommand("summary", "View spending summary and chart"),
+    BotCommand("treesummary", "Hierarchical spending breakdown"),
     BotCommand("insights", "Get AI financial insights"),
     BotCommand("subscriptions", "View recurring expenses"),
     BotCommand("setbudget", "Set category budget"),
     BotCommand("export", "Export expenses to CSV"),
+    BotCommand("report", "Generate PDF expense report"),
+    BotCommand("balance", "View wallet balances"),
+    BotCommand("wallet", "Add a wallet (e.g. /wallet cash 5000)"),
+    BotCommand("transfer", "Transfer between wallets"),
+    BotCommand("lend", "Record money lent (e.g. /lend John 500)"),
+    BotCommand("borrow", "Record money borrowed"),
+    BotCommand("debts", "View outstanding debts"),
     BotCommand("stats", "View your streaks and badges"),
     BotCommand("reminders", "Toggle smart reminders on/off"),
     BotCommand("suggestions", "Get spending suggestions per category"),
@@ -66,19 +84,46 @@ BOT_COMMANDS = [
 ]
 
 COMMAND_ALIASES = {
-    "start": ("start", "restart"),
-    "help": ("help", "commands", "menu", "what can you do", "how to use"),
+    "start": ("start", "restart", "shuru", "thudangu", "aarambham"),
+    "help": ("help", "commands", "menu", "what can you do", "how to use",
+             "madad", "sahayam", "udavi", "sahaya"),
     "language": ("language", "lang", "bhasha", "bhasa"),
-    "summary": ("summary", "summarise", "summarize", "report", "snapshot", "spending summary"),
-    "insights": ("insights", "insight", "advice", "tips", "financial insights"),
-    "subscriptions": ("subscriptions", "recurring", "recurring expenses", "subs"),
-    "setbudget": ("setbudget", "set budget", "budget"),
-    "export": ("export", "download", "csv", "excel"),
-    "stats": ("stats", "statistics", "streak", "badges", "achievements"),
-    "reminders": ("reminders", "reminder", "remind me", "toggle reminders"),
-    "suggestions": ("suggestions", "suggestion", "suggest", "spending suggestions"),
-    "dashboard": ("dashboard", "command center", "open dashboard", "web dashboard"),
+    "summary": ("summary", "summarise", "summarize", "snapshot", "spending summary",
+                "saransh", "saaram", "surukkam", "sangrahamu"),
+    "treesummary": ("treesummary", "tree summary", "tree", "category tree", "hierarchical summary", "breakdown",
+                    "vibhajan", "vargeekaranam", "pirivu"),
+    "insights": ("insights", "insight", "advice", "tips", "financial insights",
+                 "sujhav", "nirdeshangal", "yosanai", "salahalu"),
+    "subscriptions": ("subscriptions", "recurring", "recurring expenses", "subs",
+                      "avritti", "aavarthanam", "meelameelavaru"),
+    "setbudget": ("setbudget", "set budget", "budget", "bajat", "budget set cheyyuka"),
+    "export": ("export", "download", "csv", "excel", "niryat", "irakkam"),
+    "report": ("report", "pdf report", "generate report", "expense report",
+               "vivaran", "report undakkuka", "arikkai"),
+    "balance": ("balance", "balances", "wallet balance", "show balance", "my balance", "how much money",
+                "bakaya", "shesh", "balance kanikku", "iruppu", "migilindi"),
+    "wallet": ("wallet", "add wallet", "new wallet", "create wallet",
+               "batua", "purse", "wallet undakkuka", "panam pai"),
+    "transfer": ("transfer", "move money", "send money", "transfer money",
+                 "bhejein", "panam maaruka", "panam anuppu", "badili"),
+    "lend": ("lend", "lent", "gave", "loan to", "lend money",
+             "udhar diya", "panam koduthu", "kadan koduthu", "appichanu"),
+    "borrow": ("borrow", "borrowed", "took loan", "borrow money",
+               "udhar liya", "panam vanghi", "kadan vanghi", "appichanu vanghi"),
+    "debts": ("debts", "debt", "who owes", "owe", "outstanding", "lending", "borrowing",
+              "karz", "kadam", "kadan", "appukal", "aappu"),
+    "stats": ("stats", "statistics", "streak", "badges", "achievements",
+              "ankde", "kanakku", "pulli", "sankhyalu"),
+    "reminders": ("reminders", "reminder", "remind me", "toggle reminders",
+                  "yaad dilao", "ormapaduthu", "ninaivuppaduthu"),
+    "suggestions": ("suggestions", "suggestion", "suggest", "spending suggestions",
+                    "sujhav", "nirdeshangal", "parinaamangal"),
+    "dashboard": ("dashboard", "command center", "open dashboard", "web dashboard",
+                  "niyantran kaksha", "dashboard thurakku", "dashboard tira"),
 }
+
+# Categories that represent money coming IN (not expenses)
+INCOME_CATEGORIES = {"Income"}
 
 
 # ── helpers ──────────────────────────────────────────────────────────
@@ -88,7 +133,6 @@ def _lang(update):
 
 
 async def _reply(update, text, lang=None, **kwargs):
-    """Send a translated reply. Markdown parse_mode by default."""
     lang = lang or _lang(update)
     translated = translate_response(text, lang)
     await update.message.reply_text(translated, parse_mode='Markdown', **kwargs)
@@ -102,6 +146,9 @@ def resolve_text_command(text):
     normalized = " ".join((text or "").strip().lower().split())
     if not normalized:
         return None
+    # Exact greetings → help
+    if normalized in ("hi", "hello", "hey", "hii", "helo", "yo", "hola"):
+        return "help"
     if normalized.startswith("/"):
         command = normalized[1:].split()[0].split("@")[0]
         return command if command in COMMAND_ALIASES else None
@@ -110,7 +157,7 @@ def resolve_text_command(text):
             return command
         if command != "start" and any(normalized.startswith(f"{alias} ") for alias in aliases):
             return command
-        if command in {"summary", "insights", "dashboard", "help"} and any(alias in normalized for alias in aliases):
+        if command in {"summary", "insights", "dashboard", "help", "balance", "debts", "report", "treesummary"} and any(alias in normalized for alias in aliases):
             return command
     return None
 
@@ -123,13 +170,18 @@ def log_expense_items(user_id, items, source):
         if amount <= 0 or not description:
             continue
         category = get_category(description)
+        # Override category for income/salary/loan types detected by LLM
+        item_type = item.get("type", "expense")
+        if item_type in ("income", "salary", "credit"):
+            category = "Income"
         metadata = {
             key: item[key]
             for key in (
                 "currency", "original_amount", "original_currency", "fx_rate",
                 "split_people", "reimbursable_amount", "status", "confidence",
+                "type", "date",
             )
-            if key in item
+            if key in item and item[key] is not None
         }
         save_expense(user_id, amount, category, description, source=source, metadata=metadata)
         logged.append({"amount": amount, "category": category, "description": description, **metadata})
@@ -146,9 +198,19 @@ def _format_original_amount(item):
     return f"₹{_format_amount(float(original_amount))}"
 
 
-def build_logged_message(logged, prefix="✅ Logged"):
+def build_logged_message(logged, prefix=None):
     if len(logged) == 1:
         item = logged[0]
+        item_type = item.get("type", "expense")
+        if item_type in ("income", "salary", "credit"):
+            icon = "💰"
+            prefix = prefix or "💰 Received"
+        elif item_type in ("loan", "debt", "emi"):
+            icon = "🏦"
+            prefix = prefix or "🏦 Logged"
+        else:
+            icon = "✅"
+            prefix = prefix or "✅ Logged"
         lines = [
             f"{prefix} ₹{_format_amount(item['amount'])} under **{item['category']}**\n"
             f"📝 *{item['description']}*"
@@ -163,95 +225,35 @@ def build_logged_message(logged, prefix="✅ Logged"):
             )
         return "\n".join(lines)
 
-    lines = [f"✅ Logged {len(logged)} expenses:"]
-    for item in logged:
-        detail = f"• ₹{_format_amount(item['amount'])} - **{item['category']}** - {item['description']}"
+    total = sum(item['amount'] for item in logged)
+    lines = [f"✅ Logged **{len(logged)} items** — Total: **₹{_format_amount(total)}**\n"]
+    shown = logged if len(logged) <= 20 else logged[:18]
+    for item in shown:
+        item_type = item.get("type", "expense")
+        icon = "💰" if item_type in ("income", "salary", "credit") else "🏦" if item_type in ("loan", "debt", "emi") else "•"
+        detail = f"{icon} ₹{_format_amount(item['amount'])} - **{item['category']}** - {item['description']}"
         original = _format_original_amount(item)
         if item.get("original_currency"):
             detail += f" (converted from {original})"
         if item.get("split_people"):
             detail += f" (split {item['split_people']} ways)"
         lines.append(detail)
+    if len(logged) > 20:
+        lines.append(f"\n_...and {len(logged) - 18} more items_")
     return "\n".join(lines)
 
 
-# ── command handlers ─────────────────────────────────────────────────
-
-async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    user = update.effective_user
-    lang = _lang(update)
-    await _reply(update,
-        f"👋 Hello {user.first_name}! Welcome to **FineHance Omni**.\n\n"
-        "I am your frictionless financial assistant. You can:\n"
-        "🎙️ Send a voice note (e.g., 'Spent 500 on dinner')\n"
-        "👁️ Send a photo of a receipt\n"
-        "💬 Type your expense\n"
-        "🌍 Use /language to change my language\n\n"
-        "Try saying: 'I spent 300 on pizza today'",
-        lang,
-    )
-
-
-async def help_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    lang = _lang(update)
-    await _reply(update,
-        "**FineHance Omni Commands**\n\n"
-        "/start - Start the assistant\n"
-        "/summary - Spending summary and chart\n"
-        "/insights - AI financial insights\n"
-        "/subscriptions - View recurring expenses\n"
-        "/setbudget <category> <amount> - Set budget alerts\n"
-        "/export - Download expenses as CSV\n"
-        "/stats - View streaks and badges\n"
-        "/reminders - Toggle smart reminders on/off\n"
-        "/suggestions - Get spending suggestions per category\n"
-        "/language - Change bot language\n"
-        "/dashboard - Dashboard link\n"
-        "/help - Show this menu\n\n"
-        "You can also type the same words as normal messages, or just send expenses like:\n"
-        "Spent 3000 on dinner, split with 4 people\n"
-        "Food-inu 200 spent aayi\n"
-        "Spent 50 dollars on lunch\n\n"
-        "Or ask questions like:\n"
-        "Show me my spending this week\n"
-        "How much did I spend on food?",
-        lang,
-    )
-
-
-async def language(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    buttons = [
-        [InlineKeyboardButton(name, callback_data=f"lang:{code}")]
-        for code, name in SUPPORTED_LANGUAGES.items()
-    ]
-    await update.message.reply_text(
-        "🌍 **Choose your language / भाषा चुनें / ഭാഷ തിരഞ്ഞെടുക്കുക / மொழியைத் தேர்ந்தெடுங்கள் / భాషను ఎంచుకోండి / ಭಾಷೆಯನ್ನು ಆಯ್ಕೆಮಾಡಿ**",
-        reply_markup=InlineKeyboardMarkup(buttons),
-        parse_mode='Markdown',
-    )
-
-
-async def language_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    query = update.callback_query
-    await query.answer()
-    code = query.data.split(":")[1]
-    if code not in SUPPORTED_LANGUAGES:
-        return
-    set_user_language(query.from_user.id, code)
-    lang_name = SUPPORTED_LANGUAGES[code]
-    confirm = translate_response(f"✅ Language set to **{lang_name}**!\n\nAll my responses will now be in {lang_name}.", code)
-    await query.edit_message_text(confirm, parse_mode='Markdown')
-
+# ── intent dispatch ──────────────────────────────────────────────────
 
 async def _dispatch_intent(voice_cmd, update, context):
-    """Dispatch a classified intent dict to the right handler. Returns True if handled."""
     if not voice_cmd:
         return False
     cmd = voice_cmd['command']
     handler = {
         'start': start, 'help': help_command, 'language': language,
-        'summary': summary, 'insights': insights,
+        'summary': summary, 'treesummary': treesummary, 'insights': insights,
         'subscriptions': subscriptions, 'export': export_expenses,
+        'report': report_pdf, 'balance': balance, 'debts': debts,
         'stats': stats, 'reminders': reminders, 'dashboard': dashboard,
         'suggestions': suggestions,
     }.get(cmd)
@@ -282,6 +284,97 @@ async def _dispatch_intent(voice_cmd, update, context):
     return False
 
 
+# ── command handlers ─────────────────────────────────────────────────
+
+async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    user = update.effective_user
+    await _reply(update,
+        f"👋 Hello {user.first_name}! Welcome to **FineHance Omni**.\n\n"
+        "I am your frictionless financial assistant. You can:\n"
+        "🎙️ Send a voice note (e.g., 'Spent 500 on dinner')\n"
+        "👁️ Send a photo of a receipt\n"
+        "💬 Type your expense or income\n"
+        "💰 Track salary, loans, EMIs and debts\n"
+        "🌍 Use /language to change my language\n\n"
+        "Try: 'I spent 300 on pizza today'\n"
+        "Or: 'Received 50000 salary'\n"
+        "Or: 'Paid 5000 EMI for home loan'",
+        _lang(update),
+    )
+
+
+async def help_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    lang = _lang(update)
+    await _reply(update,
+        "👋 **Welcome to FineHance Omni!**\n"
+        "I'm your AI financial assistant. Here's everything I can do:\n\n"
+
+        "━━━ 💬 *Just Talk to Me* ━━━\n"
+        "Send a voice note or text in *any language*:\n"
+        "• _\"Spent 500 on coffee\"_\n"
+        "• _\"Dinner 3000, split with 4 people\"_\n"
+        "• _\"Food-inu 200 spent aayi\"_ (Malayalam)\n"
+        "• _\"50 dollars lunch\"_\n"
+        "📸 Or snap a photo of a receipt!\n\n"
+
+        "━━━ 📊 *View Your Finances* ━━━\n"
+        "/summary — Spending chart + AI analysis\n"
+        "/treesummary — Category breakdown as a tree\n"
+        "/insights — AI-powered financial advice\n"
+        "/report — Download PDF expense report\n"
+        "/export — Download CSV spreadsheet\n"
+        "/dashboard — Open the web dashboard\n\n"
+
+        "━━━ 💰 *Wallets & Money* ━━━\n"
+        "/wallet cash 5000 — Create a wallet\n"
+        "/balance — See all wallet balances\n"
+        "/transfer cash hdfc 3000 — Move money\n\n"
+
+        "━━━ 🤝 *Lending & Borrowing* ━━━\n"
+        "/lend John 500 dinner — Record money lent\n"
+        "/borrow Sarah 1000 tickets — Record borrowed\n"
+        "/debts — See who owes whom\n\n"
+
+        "━━━ 🎯 *Budgets & Tracking* ━━━\n"
+        "/setbudget Food 5000 — Set a monthly limit\n"
+        "/subscriptions — Spot recurring charges\n"
+        "/stats — Your streaks & badges\n"
+        "/suggestions — Smart saving tips\n\n"
+
+        "━━━ ⚙️ *Settings* ━━━\n"
+        "/language — Switch language (EN/HI/ML/TA/TE/KN)\n"
+        "/reminders — Evening nudge on/off\n\n"
+
+        "💡 *Tip:* You don't need slash commands! Just type naturally:\n"
+        "_\"show my balance\"_ · _\"who owes me\"_ · _\"generate report\"_",
+        lang,
+    )
+
+
+async def language(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    buttons = [
+        [InlineKeyboardButton(name, callback_data=f"lang:{code}")]
+        for code, name in SUPPORTED_LANGUAGES.items()
+    ]
+    await update.message.reply_text(
+        "🌍 **Choose your language / भाषा चुनें / ഭാഷ തിരഞ്ഞെടുക്കുക / மொழியைத் தேர்ந்தெடுங்கள் / భాషను ఎంచుకోండి / ಭಾಷೆಯನ್ನು ಆಯ್ಕೆಮಾಡಿ**",
+        reply_markup=InlineKeyboardMarkup(buttons),
+        parse_mode='Markdown',
+    )
+
+
+async def language_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    query = update.callback_query
+    await query.answer()
+    code = query.data.split(":")[1]
+    if code not in SUPPORTED_LANGUAGES:
+        return
+    set_user_language(query.from_user.id, code)
+    lang_name = SUPPORTED_LANGUAGES[code]
+    confirm = translate_response(f"✅ Language set to **{lang_name}**!\n\nAll my responses will now be in {lang_name}.", code)
+    await query.edit_message_text(confirm, parse_mode='Markdown')
+
+
 async def handle_text(update: Update, context: ContextTypes.DEFAULT_TYPE):
     text = update.message.text
     user_id = update.effective_user.id
@@ -291,16 +384,21 @@ async def handle_text(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if command:
         handlers = {
             "start": start, "help": help_command, "language": language,
-            "summary": summary, "insights": insights,
+            "summary": summary, "treesummary": treesummary, "insights": insights,
             "subscriptions": subscriptions, "setbudget": setbudget,
-            "export": export_expenses, "stats": stats,
-            "reminders": reminders, "suggestions": suggestions, "dashboard": dashboard,
+            "export": export_expenses, "report": report_pdf,
+            "balance": balance, "wallet": wallet_cmd, "transfer": transfer_cmd,
+            "lend": lend, "borrow": borrow, "debts": debts,
+            "stats": stats, "reminders": reminders, "suggestions": suggestions,
+            "dashboard": dashboard,
         }
         await handlers[command](update, context)
         return
 
-    # Fast pattern match, then LLM fallback
-    voice_cmd = parse_voice_command(text) or classify_intent(text)
+    # If text contains numbers (amounts), skip intent classification — go straight to expense extraction
+    import re
+    has_amounts = bool(re.search(r'\d{2,}', text))
+    voice_cmd = None if has_amounts else (parse_voice_command(text) or classify_intent(text))
     if await _dispatch_intent(voice_cmd, update, context):
         return
 
@@ -311,49 +409,13 @@ async def handle_text(update: Update, context: ContextTypes.DEFAULT_TYPE):
         set_user_language(user_id, detected)
         lang = detected
 
-    if not items:
-        await _reply(update, "🤔 I couldn't catch the amount. Try saying something like 'Spent 500 on coffee'.", lang)
-        return
-
-    # Check for large amounts needing confirmation
-    large = [i for i in items if i['amount'] >= 10000]
-    if large and not context.user_data.get('confirmed_large'):
-        context.user_data['pending_items'] = items
-        context.user_data['pending_source'] = 'text'
-        context.user_data['pending_lang'] = lang
-        desc = large[0]['description']
-        amt = large[0]['amount']
-        buttons = [[InlineKeyboardButton("✅ Yes, log it", callback_data="confirm:yes"),
-                    InlineKeyboardButton("❌ Cancel", callback_data="confirm:no")]]
-        await update.message.reply_text(
-            f"⚠️ **₹{amt:,.0f}** on *{desc}* — that's a large amount. Confirm?",
-            reply_markup=InlineKeyboardMarkup(buttons), parse_mode='Markdown',
-        )
-        return
-    context.user_data.pop('confirmed_large', None)
-
-    # Check for duplicates
-    for item in items:
-        dup = check_duplicate(user_id, item['amount'], item['description'])
-        if dup:
-            context.user_data['pending_items'] = items
-            context.user_data['pending_source'] = 'text'
-            context.user_data['pending_lang'] = lang
-            buttons = [[InlineKeyboardButton("✅ Log anyway", callback_data="confirm:yes"),
-                        InlineKeyboardButton("❌ Skip", callback_data="confirm:no")]]
-            await update.message.reply_text(
-                f"🔄 This looks like a duplicate of a recent entry:\n₹{dup['amount']:,.0f} - {dup['description']}\nLog again?",
-                reply_markup=InlineKeyboardMarkup(buttons), parse_mode='Markdown',
-            )
-            return
-
     logged = log_expense_items(user_id, items, source="text")
     if logged:
         response = build_logged_message(logged)
         for item in logged:
             alert = check_budget_exceeded(user_id, item['category'])
             if alert:
-                if alert['exceeded']:
+                if alert.get('exceeded'):
                     response += f"\n\n🚨 **Budget Exceeded!**\n{alert['category']}: ₹{alert['spent']:,.0f} / ₹{alert['limit']:,.0f} ({alert['percentage']:.0f}%)"
                 else:
                     response += f"\n\n⚠️ **Budget Warning!**\n{alert['category']}: ₹{alert['spent']:,.0f} / ₹{alert['limit']:,.0f} ({alert['percentage']:.0f}%)"
@@ -380,7 +442,6 @@ async def handle_voice(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await _reply(update, "❌ Sorry, I couldn't understand the audio.", lang)
         return
 
-    # Check if it's a voice command first
     voice_cmd = parse_voice_command(text) or classify_intent(text)
     if await _dispatch_intent(voice_cmd, update, context):
         return
@@ -460,19 +521,15 @@ async def insights(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
 async def dashboard(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user_id = update.effective_user.id
-    link = f"http://localhost:8501/?user={user_id}"
-    keyboard = InlineKeyboardMarkup([
-        [InlineKeyboardButton("📊 Open Dashboard", url=link)]
-    ])
-    lang = _lang(update)
-    text = translate_response(
+    link = f"http://localhost:5173?user={user_id}"
+    await _reply(update,
         "🖥️ **Your Command Center**\n"
         "View your full financial analytics here:\n\n"
-        f"`{link}`\n\n"
-        "_(Tap the button or copy the link above)_",
-        lang,
+        f"🔗 [Open Dashboard]({link})\n\n"
+        "Make sure both the **API server** (`python bot/api_server.py`) and "
+        "**frontend** (`cd frontend && npx vite`) are running.",
+        _lang(update),
     )
-    await update.message.reply_text(text, parse_mode='Markdown', reply_markup=keyboard)
 
 
 async def subscriptions(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -677,7 +734,7 @@ async def handle_date_range_query(update: Update, context: ContextTypes.DEFAULT_
     for e in filtered:
         cats[e.get('category', 'Other')] = cats.get(e.get('category', 'Other'), 0) + e['amount']
     top_cats = sorted(cats.items(), key=lambda x: x[1], reverse=True)[:5]
-    lines = [f"📊 **Spending {label}**" + (f" on {category}" if category else "") + f"\n",
+    lines = [f"📊 **Spending {label}**" + (f" on {category}" if category else "") + "\n",
              f"💰 Total: **₹{total:,.0f}** ({count} transaction{'s' if count != 1 else ''})\n"]
     if not category:
         for cat, amt in top_cats:
@@ -692,75 +749,137 @@ async def handle_edit_expense(update: Update, context: ContextTypes.DEFAULT_TYPE
     if not result:
         await _reply(update, "📭 No expenses to edit!", lang)
         return
-    await _reply(update,
-        f"✏️ Updated last expense:\n**{result['field']}**: {result['old']} → {result['new']}",
-        lang,
-    )
+    await _reply(update, f"✏️ Updated last expense:\n**{result['field']}**: {result['old']} → {result['new']}", lang)
 
 
 async def delete_last_expense(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user_id = update.effective_user.id
     lang = _lang(update)
-    expenses = load_expenses()
-    user_key = str(user_id)
-    if user_key not in expenses or not expenses[user_key]:
+    last = pop_last_expense(user_id)
+    if not last:
         await _reply(update, "📭 No expenses to delete!", lang)
         return
-    last = expenses[user_key][-1]
-    text = translate_response(
-        f"🗑️ Delete this expense?\n₹{last['amount']:,.0f} - {last['description']}\n({last.get('category', 'Unknown')})",
-        lang,
-    )
-    buttons = [[InlineKeyboardButton("✅ Yes, delete", callback_data="del:yes"),
-                InlineKeyboardButton("❌ Cancel", callback_data="del:no")]]
-    await update.message.reply_text(text, reply_markup=InlineKeyboardMarkup(buttons), parse_mode='Markdown')
+    await _reply(update, f"✅ Deleted: ₹{last['amount']:,.0f} - {last['description']}", lang)
 
 
-async def delete_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    query = update.callback_query
-    await query.answer()
-    if query.data == "del:yes":
-        user_id = query.from_user.id
-        expenses = load_expenses()
-        user_key = str(user_id)
-        if user_key in expenses and expenses[user_key]:
-            last = expenses[user_key].pop()
-            from utils import _atomic_write, DATA_FILE
-            _atomic_write(DATA_FILE, expenses)
-            lang = get_user_language(user_id)
-            text = translate_response(f"✅ Deleted: ₹{last['amount']:,.0f} - {last['description']}", lang)
-            await query.edit_message_text(text, parse_mode='Markdown')
+async def balance(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    user_id = update.effective_user.id
+    lang = _lang(update)
+    wallets = get_wallets(user_id)
+    if not wallets:
+        await _reply(update, "📭 No wallets yet! Add one with /wallet cash 5000", lang)
+        return
+    lines = ["💰 **Wallet Balances**\n"]
+    total = 0
+    for name, info in wallets.items():
+        bal = info["balance"]
+        total += bal
+        lines.append(f"• **{name}**: ₹{bal:,.0f}")
+    lines.append(f"\n**Total**: ₹{total:,.0f}")
+    await _reply(update, "\n".join(lines), lang)
+
+
+async def wallet_cmd(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    lang = _lang(update)
+    if not context.args or len(context.args) < 1:
+        await _reply(update, "Usage: /wallet <name> [initial_balance]\nExample: /wallet hdfc 10000", lang)
+        return
+    name = context.args[0]
+    initial = float(context.args[1]) if len(context.args) > 1 else 0
+    add_wallet(update.effective_user.id, name, initial_balance=initial)
+    await _reply(update, f"✅ Wallet **{name}** created with ₹{initial:,.0f}", lang)
+
+
+async def transfer_cmd(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    lang = _lang(update)
+    if not context.args or len(context.args) < 3:
+        await _reply(update, "Usage: /transfer <from> <to> <amount>\nExample: /transfer cash hdfc 5000", lang)
+        return
+    from_w, to_w = context.args[0], context.args[1]
+    try:
+        amount = float(context.args[2])
+    except ValueError:
+        await _reply(update, "❌ Invalid amount.", lang)
+        return
+    transfer_between_wallets(update.effective_user.id, from_w, to_w, amount)
+    await _reply(update, f"✅ Transferred ₹{amount:,.0f} from **{from_w}** → **{to_w}**", lang)
+
+
+async def lend(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    lang = _lang(update)
+    if not context.args or len(context.args) < 2:
+        await _reply(update, "Usage: /lend <person> <amount> [note]\nExample: /lend John 500 dinner", lang)
+        return
+    person = context.args[0]
+    try:
+        amount = float(context.args[1])
+    except ValueError:
+        await _reply(update, "❌ Invalid amount.", lang)
+        return
+    note = " ".join(context.args[2:]) if len(context.args) > 2 else ""
+    add_ledger_entry(update.effective_user.id, "lend", person, amount, note)
+    await _reply(update, f"✅ Recorded: You lent **₹{amount:,.0f}** to **{person}**" + (f" ({note})" if note else ""), lang)
+
+
+async def borrow(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    lang = _lang(update)
+    if not context.args or len(context.args) < 2:
+        await _reply(update, "Usage: /borrow <person> <amount> [note]\nExample: /borrow Sarah 1000 tickets", lang)
+        return
+    person = context.args[0]
+    try:
+        amount = float(context.args[1])
+    except ValueError:
+        await _reply(update, "❌ Invalid amount.", lang)
+        return
+    note = " ".join(context.args[2:]) if len(context.args) > 2 else ""
+    add_ledger_entry(update.effective_user.id, "borrow", person, amount, note)
+    await _reply(update, f"✅ Recorded: You borrowed **₹{amount:,.0f}** from **{person}**" + (f" ({note})" if note else ""), lang)
+
+
+async def debts(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    user_id = update.effective_user.id
+    lang = _lang(update)
+    outstanding = get_outstanding_debts(user_id)
+    if not outstanding:
+        await _reply(update, "✅ No outstanding debts!", lang)
+        return
+    lines = ["📋 **Outstanding Debts**\n"]
+    for person, amount in sorted(outstanding.items(), key=lambda x: -abs(x[1])):
+        if amount > 0:
+            lines.append(f"• **{person}** owes you ₹{amount:,.0f}")
         else:
-            await query.edit_message_text("📭 Nothing to delete.")
-    else:
-        await query.edit_message_text("❌ Cancelled.")
+            lines.append(f"• You owe **{person}** ₹{abs(amount):,.0f}")
+    await _reply(update, "\n".join(lines), lang)
 
 
-async def confirm_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    query = update.callback_query
-    await query.answer()
-    if query.data == "confirm:yes":
-        items = context.user_data.pop('pending_items', [])
-        source = context.user_data.pop('pending_source', 'text')
-        lang = context.user_data.pop('pending_lang', 'en')
-        context.user_data['confirmed_large'] = True
-        user_id = query.from_user.id
-        logged = log_expense_items(user_id, items, source=source)
-        if logged:
-            text = build_logged_message(logged)
-            velocity = check_spending_velocity(user_id)
-            if velocity:
-                text += f"\n\n🏎️ **Spending Alert:** ₹{velocity['today']:,.0f} today — {velocity['ratio']}x your daily avg"
-            text = translate_response(text, lang)
-            await query.edit_message_text(text, parse_mode='Markdown')
-        else:
-            await query.edit_message_text("❌ Failed to log.")
-        context.user_data.pop('confirmed_large', None)
-    else:
-        context.user_data.pop('pending_items', None)
-        context.user_data.pop('pending_source', None)
-        context.user_data.pop('pending_lang', None)
-        await query.edit_message_text("❌ Cancelled.")
+async def report_pdf(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    user_id = update.effective_user.id
+    lang = _lang(update)
+    days = 30
+    if context.args:
+        try:
+            days = int(context.args[0])
+        except ValueError:
+            pass
+    await context.bot.send_chat_action(chat_id=update.effective_message.chat_id, action="upload_document")
+    path = generate_pdf_report(user_id, days)
+    if not path:
+        await _reply(update, "📭 No expenses to report!", lang)
+        return
+    caption = translate_response(f"📊 Expense report — last {days} days", lang)
+    with open(path, 'rb') as f:
+        await update.message.reply_document(document=f, filename=f"finehance_report_{days}d.pdf", caption=caption)
+
+
+async def treesummary(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    user_id = update.effective_user.id
+    lang = _lang(update)
+    text = build_hierarchical_summary(user_id)
+    if not text:
+        await _reply(update, "📭 No expenses logged yet!", lang)
+        return
+    await _reply(update, text, lang)
 
 
 async def setup_bot_commands(application):
@@ -788,9 +907,15 @@ if __name__ == '__main__':
         application.add_handler(CommandHandler('reminders', reminders))
         application.add_handler(CommandHandler('suggestions', suggestions))
         application.add_handler(CommandHandler('dashboard', dashboard))
+        application.add_handler(CommandHandler('balance', balance))
+        application.add_handler(CommandHandler('wallet', wallet_cmd))
+        application.add_handler(CommandHandler('transfer', transfer_cmd))
+        application.add_handler(CommandHandler('lend', lend))
+        application.add_handler(CommandHandler('borrow', borrow))
+        application.add_handler(CommandHandler('debts', debts))
+        application.add_handler(CommandHandler('report', report_pdf))
+        application.add_handler(CommandHandler('treesummary', treesummary))
         application.add_handler(CallbackQueryHandler(language_callback, pattern=r"^lang:"))
-        application.add_handler(CallbackQueryHandler(delete_callback, pattern=r"^del:"))
-        application.add_handler(CallbackQueryHandler(confirm_callback, pattern=r"^confirm:"))
         application.add_handler(MessageHandler(filters.TEXT, handle_text))
         application.add_handler(MessageHandler(filters.VOICE, handle_voice))
         application.add_handler(MessageHandler(filters.PHOTO, handle_image))

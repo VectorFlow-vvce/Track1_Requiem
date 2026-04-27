@@ -48,21 +48,21 @@ export function Transactions() {
               <td className="px-6 py-4 font-medium text-slate-900">AWS Services</td>
               <td className="px-6 py-4 text-slate-500">Infrastructure</td>
               <td className="px-6 py-4"><span className="rounded-full bg-emerald-50 px-2 py-1 text-xs font-medium text-emerald-700">Completed</span></td>
-              <td className="px-6 py-4 text-right font-medium text-slate-900">-$1,240.20</td>
+              <td className="px-6 py-4 text-right font-medium text-slate-900">-₹1,240.20</td>
             </tr>
             <tr className="transition-colors hover:bg-slate-50/50">
               <td className="px-6 py-4 text-slate-500">Apr 26, 2026</td>
               <td className="px-6 py-4 font-medium text-slate-900">Acme Corp</td>
               <td className="px-6 py-4 text-slate-500">Income</td>
               <td className="px-6 py-4"><span className="rounded-full bg-emerald-50 px-2 py-1 text-xs font-medium text-emerald-700">Completed</span></td>
-              <td className="px-6 py-4 text-right font-medium text-emerald-600">+$4,500.00</td>
+              <td className="px-6 py-4 text-right font-medium text-emerald-600">+₹4,500.00</td>
             </tr>
             <tr className="transition-colors hover:bg-slate-50/50">
               <td className="px-6 py-4 text-slate-500">Apr 25, 2026</td>
               <td className="px-6 py-4 font-medium text-slate-900">Stripe</td>
               <td className="px-6 py-4 text-slate-500">Software</td>
               <td className="px-6 py-4"><span className="rounded-full bg-amber-50 px-2 py-1 text-xs font-medium text-amber-700">Processing</span></td>
-              <td className="px-6 py-4 text-right font-medium text-slate-900">-$299.00</td>
+              <td className="px-6 py-4 text-right font-medium text-slate-900">-₹299.00</td>
             </tr>
           </tbody>
         </table>

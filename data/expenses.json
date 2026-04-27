@@ -48,6 +48,329 @@
             "description": "Spinach & Artichoke Dip, Caesar Salad, Pan-Seared Salmon, NY Strip Steak, Chicken Alfredo Pasta, Cabernet Sauvignon, Iced Tea, Chocolate Lava Cake",
             "source": "image",
             "timestamp": "2026-04-27T13:01:01.727957"
+        },
+        {
+            "amount": 600.0,
+            "category": "Food Delivery",
+            "description": "Ate mandi",
+            "source": "text",
+            "timestamp": "2026-04-27T13:37:47.548098",
+            "original_amount": 1200.0,
+            "split_people": 2,
+            "reimbursable_amount": 600.0,
+            "status": "settled"
+        },
+        {
+            "amount": 443.0,
+            "category": "Restaurants",
+            "description": "2 porottas with egg curry",
+            "source": "voice",
+            "timestamp": "2026-04-27T14:30:38.361079"
+        },
+        {
+            "amount": 250.0,
+            "category": "Restaurants",
+            "description": "Biryani",
+            "source": "voice",
+            "timestamp": "2026-04-27T14:31:40.110166"
+        },
+        {
+            "amount": 850.0,
+            "category": "Groceries",
+            "description": "Food",
+            "source": "voice",
+            "timestamp": "2026-04-27T14:32:39.292942"
+        },
+        {
+            "amount": 2990.0,
+            "category": "Fast Food",
+            "description": "Two parathas",
+            "source": "voice",
+            "timestamp": "2026-04-27T14:33:42.146597"
+        },
+        {
+            "amount": 5000.0,
+            "category": "Groceries",
+            "description": "Food",
+            "source": "text",
+            "timestamp": "2026-04-27T14:46:50.233771"
+        },
+        {
+            "amount": 749.0,
+            "category": "Subscriptions",
+            "description": "Netflix",
+            "source": "text",
+            "timestamp": "2026-04-27T14:48:48.627737"
+        },
+        {
+            "amount": 250.0,
+            "category": "Restaurants",
+            "description": "Appam and beef",
+            "source": "text",
+            "timestamp": "2026-04-27T15:53:08.486105",
+            "wallet": "cash",
+            "type": "expense"
+        },
+        {
+            "amount": 0.5,
+            "category": "Groceries",
+            "description": "Food",
+            "source": "text",
+            "timestamp": "2026-04-27T15:55:10.719176",
+            "wallet": "cash",
+            "type": "expense"
+        },
+        {
+            "amount": 2685.0,
+            "category": "Groceries",
+            "description": "Reliance grocery",
+            "source": "text",
+            "wallet": "cash",
+            "type": "expense",
+            "timestamp": "2026-04-27T16:06:01.419424"
+        },
+        {
+            "amount": 55.0,
+            "category": "Coffee & Beverages",
+            "description": "Egg puffs and chai",
+            "source": "text",
+            "wallet": "cash",
+            "type": "expense",
+            "timestamp": "2026-04-27T16:06:01.421098"
+        },
+        {
+            "amount": 1620.0,
+            "category": "Gas & Fuel",
+            "description": "Indian Oil petrol",
+            "source": "text",
+            "wallet": "cash",
+            "type": "expense",
+            "timestamp": "2026-04-27T16:06:01.422250"
+        },
+        {
+            "amount": 2195.0,
+            "category": "Bills & Utilities",
+            "description": "Electricity bill",
+            "source": "text",
+            "wallet": "cash",
+            "type": "expense",
+            "timestamp": "2026-04-27T16:06:01.423384"
+        },
+        {
+            "amount": 899.0,
+            "category": "Bills & Utilities",
+            "description": "WiFi recharge",
+            "source": "text",
+            "wallet": "cash",
+            "type": "expense",
+            "timestamp": "2026-04-27T16:06:01.424430"
+        },
+        {
+            "amount": 3120.0,
+            "category": "Shopping & Retail",
+            "description": "Amazon random items",
+            "source": "text",
+            "wallet": "cash",
+            "type": "expense",
+            "timestamp": "2026-04-27T16:06:01.425318"
+        },
+        {
+            "amount": 240.0,
+            "category": "Restaurants",
+            "description": "Biryani",
+            "source": "text",
+            "wallet": "cash",
+            "type": "expense",
+            "timestamp": "2026-04-27T16:06:01.426205"
+        },
+        {
+            "amount": 40.0,
+            "category": "Transportation",
+            "description": "Cola",
+            "source": "text",
+            "wallet": "cash",
+            "type": "expense",
+            "timestamp": "2026-04-27T16:06:01.426957"
+        },
+        {
+            "amount": 60.0,
+            "category": "Restaurants",
+            "description": "Idli breakfast",
+            "source": "text",
+            "wallet": "cash",
+            "type": "expense",
+            "timestamp": "2026-04-27T16:06:01.428330"
+        },
+        {
+            "amount": 20.0,
+            "category": "Coffee & Beverages",
+            "description": "Tea",
+            "source": "text",
+            "wallet": "cash",
+            "type": "expense",
+            "timestamp": "2026-04-27T16:06:01.429140"
+        },
+        {
+            "amount": 145.0,
+            "category": "Transportation",
+            "description": "Auto ride",
+            "source": "text",
+            "wallet": "cash",
+            "type": "expense",
+            "timestamp": "2026-04-27T16:06:01.429888"
+        },
+        {
+            "amount": 375.0,
+            "category": "Healthcare",
+            "description": "Pharmacy tablets",
+            "source": "text",
+            "wallet": "cash",
+            "type": "expense",
+            "timestamp": "2026-04-27T16:06:01.430608"
+        },
+        {
+            "amount": 2140.0,
+            "category": "Groceries",
+            "description": "Mid month grocery",
+            "source": "text",
+            "wallet": "cash",
+            "type": "expense",
+            "timestamp": "2026-04-27T16:06:01.431302"
+        },
+        {
+            "amount": 30.0,
+            "category": "Food Delivery",
+            "description": "Bakery egg puff",
+            "source": "text",
+            "wallet": "cash",
+            "type": "expense",
+            "timestamp": "2026-04-27T16:06:05.364487"
+        },
+        {
+            "amount": 28.0,
+            "category": "Food Delivery",
+            "description": "Bakery veg puff",
+            "source": "text",
+            "wallet": "cash",
+            "type": "expense",
+            "timestamp": "2026-04-27T16:06:05.371388"
+        },
+        {
+            "amount": 20.0,
+            "category": "Coffee & Beverages",
+            "description": "Bakery tea",
+            "source": "text",
+            "wallet": "cash",
+            "type": "expense",
+            "timestamp": "2026-04-27T16:06:05.372564"
+        },
+        {
+            "amount": 1740.0,
+            "category": "Gas & Fuel",
+            "description": "Shell petrol",
+            "source": "text",
+            "wallet": "cash",
+            "type": "expense",
+            "timestamp": "2026-04-27T16:06:05.373436"
+        },
+        {
+            "amount": 520.0,
+            "category": "Restaurants",
+            "description": "Dinner with friend",
+            "source": "text",
+            "wallet": "cash",
+            "type": "expense",
+            "timestamp": "2026-04-27T16:06:05.380396"
+        },
+        {
+            "amount": 210.0,
+            "category": "Coffee & Beverages",
+            "description": "Coffee",
+            "source": "text",
+            "wallet": "cash",
+            "type": "expense",
+            "timestamp": "2026-04-27T16:06:05.381630"
+        },
+        {
+            "amount": 190.0,
+            "category": "Coffee & Beverages",
+            "description": "Coffee",
+            "source": "text",
+            "wallet": "cash",
+            "type": "expense",
+            "timestamp": "2026-04-27T16:06:05.382607"
+        },
+        {
+            "amount": 120.0,
+            "category": "Convenience",
+            "description": "Snacks",
+            "source": "text",
+            "wallet": "cash",
+            "type": "expense",
+            "timestamp": "2026-04-27T16:06:05.383618"
+        },
+        {
+            "amount": 95.0,
+            "category": "Transportation",
+            "description": "Chocolates",
+            "source": "text",
+            "wallet": "cash",
+            "type": "expense",
+            "timestamp": "2026-04-27T16:06:05.384501"
+        },
+        {
+            "amount": 2480.0,
+            "category": "Groceries",
+            "description": "End month grocery",
+            "source": "text",
+            "wallet": "cash",
+            "type": "expense",
+            "timestamp": "2026-04-27T16:06:05.385437"
+        },
+        {
+            "amount": 600.0,
+            "category": "Restaurants",
+            "description": "Parotta",
+            "source": "text",
+            "wallet": "cash",
+            "type": "expense",
+            "timestamp": "2026-04-27T16:07:05.597477"
+        },
+        {
+            "amount": 810.0,
+            "category": "Bills & Utilities",
+            "description": "Payment to Navaneeth K via UPI",
+            "source": "image",
+            "wallet": "cash",
+            "confidence": 0.95,
+            "timestamp": "2026-04-27T16:09:37.081181"
+        },
+        {
+            "amount": 6838.0,
+            "category": "Food Delivery",
+            "description": "2 puffs",
+            "source": "text",
+            "wallet": "cash",
+            "type": "expense",
+            "timestamp": "2026-04-27T16:10:46.056873"
+        },
+        {
+            "amount": 45000.0,
+            "category": "Income",
+            "description": "Salary credited",
+            "source": "text",
+            "wallet": "cash",
+            "type": "income",
+            "timestamp": "2026-04-27T16:11:39.070053"
+        },
+        {
+            "amount": 22300.0,
+            "category": "Income",
+            "description": "Salary received",
+            "source": "voice",
+            "wallet": "cash",
+            "type": "income",
+            "timestamp": "2026-04-27T16:18:31.845615"
         }
     ]
 }

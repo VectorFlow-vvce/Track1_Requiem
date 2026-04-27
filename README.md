@@ -47,16 +47,46 @@ Powered by the **Setu Account Aggregator** framework.
 
 ### 🌍 5. South Indian Multilingual Support
 Talk to the bot in your native language. We support:
-- **Malayalam (മലയാളം)**
-- **Tamil (தமிழ்)**
-- **Telugu (తెలుగు)**
-- **Kannada (ಕನ್ನಡ)**
-- *English & Hindi (Standard)*
+- **Malayalam (മലയാളം)**, **Tamil (தமிழ்)**, **Telugu (తెలుగు)**, **Kannada (ಕನ್ನಡ)**, *English & Hindi*
 
-### 📊 6. Professional Visualization & Insights
+### 💰 6. Wallet & Account Tracking
+Track money across multiple wallets — cash, bank accounts, UPI, credit cards.
+- `/wallet cash 5000` — Create a wallet with an initial balance
+- `/balance` — View all wallet balances at a glance
+- `/transfer cash hdfc 3000` — Move money between wallets
+- Every expense auto-deducts from the correct wallet
+
+### 🤝 7. Lending & Borrowing Ledger
+Never forget who owes whom.
+- `/lend John 500 dinner` — Record money you lent
+- `/borrow Sarah 1000 tickets` — Record money you borrowed
+- `/debts` — See all outstanding balances at a glance
+
+### 📄 8. PDF Expense Reports
+Generate professional PDF reports with charts and transaction tables.
+- `/report` — Last 30 days (default)
+- `/report 7` — Last 7 days
+- Includes category breakdown bar chart + transaction table
+
+### 🌳 9. Hierarchical Spending Summary
+See your spending organized in a tree structure by parent category → subcategory.
+- `/treesummary` — Beautiful tree-formatted breakdown
+```
+├── Food — ₹3,200
+│   ├── Restaurants: ₹1,500
+│   ├── Fast Food: ₹800
+│   └── Groceries: ₹900
+├── Transport — ₹2,100
+│   ├── Travel: ₹1,400
+│   └── Transportation: ₹700
+└── Lifestyle — ₹749
+    └── Subscriptions: ₹749
+```
+
+### 📊 10. Professional Visualization & Insights
 - **In-Bot Charts:** Get instant Pie Charts directly in your Telegram chat via `/summary`.
 - **AI Insights:** Proactive advice based on spending patterns.
-- **Web Dashboard:** A real-time **Streamlit** command center for deep-dives and historical tracking.
+- **Web Dashboard:** A real-time **Vite + React** command center with live data sync — every expense logged via the bot appears on the dashboard within seconds.
 
 ---
 
@@ -76,7 +106,9 @@ graph TD
     H --> I[(JSON/Local Storage)]
     I --> J[Analytics Engine: Matplotlib/Plotly]
     J --> K[Telegram Summary/Charts]
-    I --> L[Streamlit Web Dashboard]
+    I --> L[Vite + React Dashboard]
+    I --> M[API Server :8787]
+    M --> L
 ```
 
 ---
@@ -90,6 +122,33 @@ This project is built using a collaborative agent-based approach:
 
 ## 🏷️ Supported Categories (23)
 `Bills & Utilities` • `Cash & ATM` • `Childcare` • `Coffee & Beverages` • `Convenience` • `Education` • `Entertainment` • `Fast Food` • `Food Delivery` • `Gas & Fuel` • `Giving` • `Groceries` • `Healthcare` • `Housing` • `Income` • `Insurance` • `Other` • `Restaurants` • `Shopping & Retail` • `Subscriptions` • `Transfers` • `Transportation` • `Travel`
+
+---
+
+## 🤖 Bot Commands
+
+| Command | Description |
+|---------|-------------|
+| `/start` | Start the assistant |
+| `/help` | Show all commands |
+| `/language` | Change bot language |
+| `/summary` | Spending summary with chart |
+| `/treesummary` | Hierarchical spending breakdown |
+| `/insights` | AI financial insights |
+| `/balance` | View wallet balances |
+| `/wallet <name> [amount]` | Add a new wallet |
+| `/transfer <from> <to> <amount>` | Transfer between wallets |
+| `/lend <person> <amount> [note]` | Record money lent |
+| `/borrow <person> <amount> [note]` | Record money borrowed |
+| `/debts` | View outstanding debts |
+| `/report [days]` | Generate PDF expense report |
+| `/subscriptions` | View recurring expenses |
+| `/setbudget <category> <amount>` | Set budget alerts |
+| `/export` | Download expenses as CSV |
+| `/stats` | View streaks and badges |
+| `/reminders` | Toggle smart reminders |
+| `/suggestions` | Spending suggestions per category |
+| `/dashboard` | Open the web dashboard |
 
 ---
 
@@ -119,9 +178,13 @@ SETU_PRODUCT_INSTANCE_ID=your_instance_id
 ```bash
 python bot/bot.py
 ```
+**Start the API Server (for dashboard):**
+```bash
+python bot/api_server.py
+```
 **Start the Dashboard:**
 ```bash
-streamlit run dashboard/app.py
+cd frontend && npm install && npx vite
 ```
 
 ---

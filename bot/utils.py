@@ -11,6 +11,8 @@ BUDGETS_FILE = os.path.join(os.path.dirname(__file__), '../data/budgets.json')
 GAMIFICATION_FILE = os.path.join(os.path.dirname(__file__), '../data/gamification.json')
 REMINDERS_FILE = os.path.join(os.path.dirname(__file__), '../data/reminders.json')
 LANG_FILE = os.path.join(os.path.dirname(__file__), '../data/languages.json')
+WALLETS_FILE = os.path.join(os.path.dirname(__file__), '../data/wallets.json')
+LEDGER_FILE = os.path.join(os.path.dirname(__file__), '../data/ledger.json')
 FORECAST_PERIODS = 7
 
 SUPPORTED_LANGUAGES = {
@@ -64,7 +66,7 @@ def load_expenses():
         except json.JSONDecodeError:
             return {}
 
-def save_expense(user_id, amount, category, description, source="text", metadata=None):
+def save_expense(user_id, amount, category, description, source="text", metadata=None, wallet=None):
     data = load_expenses()
     user_key = str(user_id)
     if user_key not in data:
@@ -75,14 +77,25 @@ def save_expense(user_id, amount, category, description, source="text", metadata
         "category": category,
         "description": description,
         "source": source,
-        "timestamp": datetime.now().isoformat()
+        "wallet": wallet or "cash",
     }
     if metadata:
         expense.update(metadata)
 
+    # Use explicit date if provided by LLM, otherwise now
+    if "date" in expense and expense["date"]:
+        expense["timestamp"] = datetime.fromisoformat(expense["date"]).isoformat()
+        del expense["date"]
+    else:
+        expense.pop("date", None)
+        expense["timestamp"] = datetime.now().isoformat()
+
     data[user_key].append(expense)
 
     _atomic_write(DATA_FILE, data)
+
+    # Deduct from wallet balance
+    _update_wallet_balance(user_id, expense["wallet"], -amount)
     
     # Update gamification
     update_gamification(user_id)
@@ -335,49 +348,73 @@ def generate_pie_chart(user_id):
     return file_path
 
 
+KNOWN_SUBSCRIPTIONS = {
+    "netflix": 30, "spotify": 30, "amazon prime": 30, "prime video": 30,
+    "hotstar": 30, "disney": 30, "youtube premium": 30, "apple music": 30,
+    "jio cinema": 30, "zee5": 30, "sony liv": 30, "audible": 30,
+    "chatgpt": 30, "openai": 30, "github copilot": 30, "notion": 30,
+    "figma": 30, "canva": 30, "adobe": 30, "microsoft 365": 30,
+    "google one": 30, "icloud": 30, "dropbox": 30,
+    "gym": 30, "cult fit": 30, "cultfit": 30,
+}
+
+
 def detect_subscriptions(user_id):
     expenses = load_expenses().get(str(user_id), [])
-    if len(expenses) < 2:
+    if not expenses:
         return []
-    
+
     df = pd.DataFrame(expenses)
     df['timestamp'] = pd.to_datetime(df['timestamp'])
     df['date'] = df['timestamp'].dt.date
     df = df.sort_values('timestamp')
-    
+
     subscriptions = []
     seen = set()
-    
-    for desc in df['description'].unique():
-        desc_key = desc[:20].lower().strip()
-        if desc_key in seen:
-            continue
-        
-        matching = df[df['description'].str.lower().str.contains(desc_key[:15], regex=False)]
-        if len(matching) < 2:
-            continue
-        
-        amounts = matching['amount'].values
-        if len(amounts) < 2 or amounts.std() > amounts.mean() * 0.15:
-            continue
-        
-        dates = sorted(matching['date'].values)
-        if len(dates) < 2:
-            continue
-        
-        gaps = [int((pd.Timestamp(dates[i+1]) - pd.Timestamp(dates[i])).days) for i in range(len(dates)-1)]
-        avg_gap = sum(gaps) / len(gaps)
-        
-        if 20 <= avg_gap <= 40:
-            seen.add(desc_key)
-            subscriptions.append({
-                'description': desc,
-                'amount': float(amounts.mean()),
-                'frequency_days': int(avg_gap),
-                'occurrences': len(matching),
-                'category': matching.iloc[0]['category']
-            })
-    
+
+    # 1) Known subscription names — even a single entry counts
+    for _, row in df.iterrows():
+        desc_lower = str(row['description']).lower()
+        for name, freq in KNOWN_SUBSCRIPTIONS.items():
+            if name in desc_lower and name not in seen:
+                seen.add(name)
+                subscriptions.append({
+                    'description': row['description'],
+                    'amount': float(row['amount']),
+                    'frequency_days': freq,
+                    'occurrences': 1,
+                    'category': row.get('category', 'Subscriptions'),
+                })
+
+    # 2) Pattern-based detection — 2+ similar expenses with consistent amounts
+    if len(df) >= 2:
+        for desc in df['description'].unique():
+            desc_key = desc[:20].lower().strip()
+            if desc_key in seen:
+                continue
+
+            matching = df[df['description'].str.lower().str.contains(desc_key[:15], regex=False)]
+            if len(matching) < 2:
+                continue
+
+            amounts = matching['amount'].values
+            if amounts.std() > amounts.mean() * 0.15:
+                continue
+
+            dates = sorted(matching['date'].values)
+            gaps = [int((pd.Timestamp(dates[i+1]) - pd.Timestamp(dates[i])).days) for i in range(len(dates)-1)]
+            avg_gap = sum(gaps) / len(gaps) if gaps else 0
+
+            if 20 <= avg_gap <= 40:
+                seen.add(desc_key)
+                subscriptions.append({
+                    'description': desc,
+                    'amount': float(amounts.mean()),
+                    'frequency_days': int(avg_gap),
+                    'occurrences': len(matching),
+                    'category': matching.iloc[0].get('category', 'Subscriptions'),
+                })
+
     return sorted(subscriptions, key=lambda x: x['amount'], reverse=True)
 
 
@@ -676,3 +713,219 @@ def build_category_comparison(user_id):
         info["change"] = ((cur - prev) / prev * 100) if prev > 0 else (100 if cur > 0 else 0)
 
     return dict(sorted(stats.items(), key=lambda x: x[1]["current"], reverse=True))
+
+
+# ── Wallet System ────────────────────────────────────────────────────────
+
+def _load_wallets():
+    if not os.path.exists(WALLETS_FILE):
+        return {}
+    with open(WALLETS_FILE, 'r') as f:
+        try:
+            return json.load(f)
+        except json.JSONDecodeError:
+            return {}
+
+
+def _save_wallets(data):
+    _atomic_write(WALLETS_FILE, data)
+
+
+def _update_wallet_balance(user_id, wallet_name, delta):
+    """Add delta to a wallet balance. Creates wallet if it doesn't exist."""
+    data = _load_wallets()
+    user_key = str(user_id)
+    if user_key not in data:
+        data[user_key] = {}
+    wallet_name = wallet_name.lower().strip()
+    if wallet_name not in data[user_key]:
+        data[user_key][wallet_name] = {"balance": 0, "type": "cash"}
+    data[user_key][wallet_name]["balance"] = round(data[user_key][wallet_name]["balance"] + delta, 2)
+    _save_wallets(data)
+
+
+def add_wallet(user_id, name, wallet_type="cash", initial_balance=0):
+    data = _load_wallets()
+    user_key = str(user_id)
+    if user_key not in data:
+        data[user_key] = {}
+    name = name.lower().strip()
+    data[user_key][name] = {"balance": float(initial_balance), "type": wallet_type}
+    _save_wallets(data)
+    return name
+
+
+def get_wallets(user_id):
+    data = _load_wallets()
+    return data.get(str(user_id), {})
+
+
+def transfer_between_wallets(user_id, from_wallet, to_wallet, amount):
+    _update_wallet_balance(user_id, from_wallet, -amount)
+    _update_wallet_balance(user_id, to_wallet, amount)
+
+
+# ── Lending / Borrowing Ledger ───────────────────────────────────────────
+
+def _load_ledger():
+    if not os.path.exists(LEDGER_FILE):
+        return {}
+    with open(LEDGER_FILE, 'r') as f:
+        try:
+            return json.load(f)
+        except json.JSONDecodeError:
+            return {}
+
+
+def _save_ledger(data):
+    _atomic_write(LEDGER_FILE, data)
+
+
+def add_ledger_entry(user_id, entry_type, person, amount, note=""):
+    """entry_type: 'lend' or 'borrow'"""
+    data = _load_ledger()
+    user_key = str(user_id)
+    if user_key not in data:
+        data[user_key] = []
+    data[user_key].append({
+        "type": entry_type,
+        "person": person,
+        "amount": float(amount),
+        "note": note,
+        "timestamp": datetime.now().isoformat(),
+        "settled": False,
+    })
+    _save_ledger(data)
+
+
+def get_outstanding_debts(user_id):
+    """Returns {person: net_amount} where positive = they owe you, negative = you owe them."""
+    entries = _load_ledger().get(str(user_id), [])
+    balances = {}
+    for e in entries:
+        if e.get("settled"):
+            continue
+        person = e["person"]
+        amt = e["amount"]
+        if e["type"] == "lend":
+            balances[person] = balances.get(person, 0) + amt
+        else:
+            balances[person] = balances.get(person, 0) - amt
+    return {p: round(v, 2) for p, v in balances.items() if abs(v) > 0.01}
+
+
+# ── PDF Report Generation ───────────────────────────────────────────────
+
+def generate_pdf_report(user_id, days=30):
+    """Generate a PDF expense report. Returns file path or None."""
+    expenses = load_expenses().get(str(user_id), [])
+    if not expenses:
+        return None
+
+    cutoff = datetime.now() - timedelta(days=days)
+    filtered = [
+        e for e in expenses
+        if datetime.fromisoformat(e.get("timestamp", datetime.now().isoformat())) >= cutoff
+    ]
+    if not filtered:
+        return None
+
+    df = pd.DataFrame(filtered)
+    df["timestamp"] = pd.to_datetime(df["timestamp"])
+    df = df.sort_values("timestamp", ascending=False)
+
+    total = df["amount"].sum()
+    cat_totals = df.groupby("category")["amount"].sum().sort_values(ascending=False)
+
+    fig, axes = plt.subplots(2, 1, figsize=(8.27, 11.69), dpi=120)
+    fig.patch.set_facecolor("white")
+    fig.suptitle(f"FineHance Expense Report — Last {days} Days", fontsize=16, fontweight="bold", y=0.97)
+
+    # Category bar chart
+    ax = axes[0]
+    cat_totals.plot.barh(ax=ax, color="#0F172A")
+    ax.set_title(f"Total: ₹{total:,.0f}  |  {len(df)} transactions", fontsize=11, loc="left")
+    ax.set_xlabel("Amount (₹)")
+    ax.invert_yaxis()
+
+    # Table of recent transactions
+    ax2 = axes[1]
+    ax2.axis("off")
+    table_data = df[["timestamp", "description", "category", "amount"]].head(20).copy()
+    table_data["timestamp"] = table_data["timestamp"].dt.strftime("%b %d %H:%M")
+    table_data["amount"] = table_data["amount"].apply(lambda x: f"₹{x:,.0f}")
+    table_data.columns = ["Date", "Description", "Category", "Amount"]
+    tbl = ax2.table(
+        cellText=table_data.values,
+        colLabels=table_data.columns,
+        loc="upper center",
+        cellLoc="left",
+    )
+    tbl.auto_set_font_size(False)
+    tbl.set_fontsize(8)
+    tbl.scale(1, 1.4)
+    for (row, col), cell in tbl.get_celld().items():
+        if row == 0:
+            cell.set_facecolor("#0F172A")
+            cell.set_text_props(color="white", fontweight="bold")
+        cell.set_edgecolor("#E2E8F0")
+
+    fig.tight_layout(rect=[0, 0, 1, 0.95])
+    os.makedirs("assets", exist_ok=True)
+    path = f"assets/{user_id}_report.pdf"
+    fig.savefig(path)
+    plt.close(fig)
+    return path
+
+
+# ── Subcategory Summary (Hierarchical) ──────────────────────────────────
+
+SUBCATEGORY_MAP = {
+    "Restaurants": "Food", "Fast Food": "Food", "Food Delivery": "Food",
+    "Coffee & Beverages": "Food", "Groceries": "Food",
+    "Transportation": "Transport", "Gas & Fuel": "Transport", "Travel": "Transport",
+    "Shopping & Retail": "Shopping",
+    "Entertainment": "Lifestyle", "Subscriptions": "Lifestyle",
+    "Bills & Utilities": "Housing", "Housing": "Housing",
+    "Healthcare": "Health", "Insurance": "Health",
+    "Education": "Education",
+    "Income": "Income",
+}
+
+
+def build_hierarchical_summary(user_id):
+    """Build a tree-formatted summary string grouped by parent → subcategory."""
+    expenses = load_expenses().get(str(user_id), [])
+    if not expenses:
+        return None
+
+    cat_totals = {}
+    for e in expenses:
+        cat = e.get("category", "Other")
+        cat_totals[cat] = cat_totals.get(cat, 0) + e.get("amount", 0)
+
+    # Group into parent categories
+    tree = {}
+    for cat, total in sorted(cat_totals.items(), key=lambda x: -x[1]):
+        parent = SUBCATEGORY_MAP.get(cat, "Other")
+        if parent not in tree:
+            tree[parent] = {}
+        tree[parent][cat] = total
+
+    lines = []
+    parents = sorted(tree.items(), key=lambda x: -sum(x[1].values()))
+    for i, (parent, children) in enumerate(parents):
+        parent_total = sum(children.values())
+        is_last_parent = i == len(parents) - 1
+        prefix = "└── " if is_last_parent else "├── "
+        lines.append(f"{prefix}**{parent}** — ₹{parent_total:,.0f}")
+        child_items = sorted(children.items(), key=lambda x: -x[1])
+        for j, (child, amt) in enumerate(child_items):
+            is_last_child = j == len(child_items) - 1
+            branch = "    " if is_last_parent else "│   "
+            connector = "└── " if is_last_child else "├── "
+            lines.append(f"{branch}{connector}{child}: ₹{amt:,.0f}")
+
+    grand_total = sum(cat_totals.values())
+    lines.insert(0, f"📊 **Spending Summary** — ₹{grand_total:,.0f} total\n")
+    return "\n".join(lines)

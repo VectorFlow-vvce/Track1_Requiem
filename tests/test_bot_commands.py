@@ -15,7 +15,7 @@ class BotCommandTests(unittest.TestCase):
 
         self.assertEqual(
             command_names,
-            ["start", "help", "language", "summary", "insights", "subscriptions", "setbudget", "export", "stats", "reminders", "suggestions", "dashboard"],
+            ["start", "help", "language", "summary", "treesummary", "insights", "subscriptions", "setbudget", "export", "report", "balance", "wallet", "transfer", "lend", "borrow", "debts", "stats", "reminders", "suggestions", "dashboard"],
         )
 
     def test_resolve_text_command_accepts_slash_and_plain_text(self):

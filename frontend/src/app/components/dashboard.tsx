@@ -4,6 +4,7 @@ import {
   AreaChart, Area, XAxis, YAxis, Tooltip, ResponsiveContainer,
   BarChart, Bar, Cell, LineChart, Line
 } from "recharts";
+import { buildDashboardMetrics } from "./dashboard-data.js";
 import {
   Search, Bell, Plus, ArrowUpRight, ArrowDownRight,
   TrendingUp, Wallet, Target, MessageSquare, Mic, Receipt,
@@ -111,145 +112,49 @@ interface Liabilities {
   expanded: boolean;
 }
 
-// ─── Mock Data ──────────────────────────────────────────────────────────
-const initialTransactions = [
-  { id: "tx_101", merchant: "Stripe", category: "Software", amount: -299.0, time: "10:42 AM", source: "auto", status: "completed" },
-  { id: "tx_102", merchant: "Acme Corp", subtitle: "Client payment", category: "Income", amount: 4500.0, time: "Yesterday", source: "auto", status: "completed" },
-  { id: "tx_103", merchant: "Uber Eats", category: "Dining", amount: -42.5, time: "Yesterday", source: "receipt", status: "completed" },
-  { id: "tx_104", merchant: "AWS Services", category: "Infrastructure", amount: -1240.2, time: "Oct 24", source: "auto", status: "completed" },
-  { id: "tx_105", merchant: "Notion Labs", category: "Software", amount: -16.0, time: "Oct 23", source: "auto", status: "completed" },
-];
+// ─── Data (populated from API) ──────────────────────────────────────────
+const initialTransactions: any[] = [];
 
-const trendData = [
-  { day: "Mon", balance: 14200, spent: 400 },
-  { day: "Tue", balance: 14000, spent: 200 },
-  { day: "Wed", balance: 18500, spent: 0 },
-  { day: "Thu", balance: 18200, spent: 300 },
-  { day: "Fri", balance: 16959, spent: 1241 },
-  { day: "Sat", balance: 16917, spent: 42 },
-  { day: "Sun", balance: 16618, spent: 299 },
-];
+const emptyTrendData: any[] = [];
 
-const categoryData = [
-  { name: "Infra", value: 1240, color: "#0F172A" },
-  { name: "Software", value: 315, color: "#1E293B" },
-  { name: "Dining", value: 247, color: "#475569" },
-  { name: "Travel", value: 180, color: "#94A3B8" },
-  { name: "Other", value: 95, color: "#CBD5E1" },
-];
+const emptyCategoryData: any[] = [];
 
-const budgets = [
-  { label: "Software", spent: 315, total: 500 },
-  { label: "Dining", spent: 247, total: 300 },
-  { label: "Infrastructure", spent: 1240, total: 1000 },
-];
+const emptyBudgets: any[] = [];
 
 const initialInsights = [
-  { id: "ins_1", type: "alert", title: "AWS Spike Detected", content: "Your AWS bill is 40% higher than last month. RDS usage drove most of the increase.", action: "View breakdown", time: "2h" },
-  { id: "ins_2", type: "success", title: "Cashflow Positive", content: "With Acme's payment cleared, you've passed monthly revenue target by 15%.", action: "Adjust targets", time: "1d" },
+  { id: "ins_1", type: "info", title: "Real-Time Tracking", content: "Your expenses sync live from the Telegram bot. Log something to see it here!", action: "Start logging", time: "now" },
 ];
 
-const sparkA = [12, 14, 13, 16, 15, 17, 18, 19].map((v, i) => ({ i, v }));
-const sparkB = [8, 9, 7, 10, 11, 9, 8, 7].map((v, i) => ({ i, v }));
-const sparkC = [4, 6, 5, 7, 8, 9, 11, 13].map((v, i) => ({ i, v }));
-const sparkD = [3, 3, 4, 4, 3, 5, 5, 4].map((v, i) => ({ i, v }));
+const sparkA = [0].map((v, i) => ({ i, v }));
+const sparkB = [0].map((v, i) => ({ i, v }));
+const sparkC = [0].map((v, i) => ({ i, v }));
+const sparkD = [0].map((v, i) => ({ i, v }));
 
-// Mock data for new features
 const mockUserProfile: UserProfile = {
-  userId: "user_001",
+  userId: "",
   coverPhotoUrl: null,
-  systemIdentifier: "@kashy_fin",
-  displayName: "Jordan",
-  createdAt: new Date("2025-01-15"),
+  systemIdentifier: "",
+  displayName: "FineHance User",
+  createdAt: new Date(),
   updatedAt: new Date(),
 };
 
-const mockWeeklySpending: WeeklySpending[] = [
-  { weekNumber: 17, startDate: "2026-04-20", endDate: "2026-04-26", total: 842.50, transactionCount: 12, topCategories: [{ category: "Dining", amount: 247 }] },
-  { weekNumber: 16, startDate: "2026-04-13", endDate: "2026-04-19", total: 1200.00, transactionCount: 8, topCategories: [{ category: "Infrastructure", amount: 1240 }] },
-  { weekNumber: 15, startDate: "2026-04-06", endDate: "2026-04-12", total: 800.00, transactionCount: 15, topCategories: [{ category: "Software", amount: 315 }] },
-];
+const mockWeeklySpending: WeeklySpending[] = [];
 
 const mockMonthlySummary: MonthlySummary = {
-  month: "2026-04",
-  totalSpent: 2842.50,
-  totalIncome: 8500.00,
-  netCashflow: 5657.50,
-  categoryBreakdown: {
-    Infrastructure: 1240,
-    Software: 315,
-    Dining: 247,
-    Travel: 180,
-    Other: 95,
-  },
-  comparisonToPreviousMonth: {
-    spentChange: -2.4,
-    incomeChange: 18.2,
-    cashflowChange: 12.5,
-  },
-  anomalies: [
-    {
-      type: "spike",
-      category: "Infrastructure",
-      percentageChange: 40,
-      description: "AWS bill is 40% higher than last month",
-      severity: "high",
-    },
-  ],
+  month: new Date().toISOString().slice(0, 7),
+  totalSpent: 0,
+  totalIncome: 0,
+  netCashflow: 0,
+  categoryBreakdown: {},
+  comparisonToPreviousMonth: { spentChange: 0, incomeChange: 0, cashflowChange: 0 },
+  anomalies: [],
   generatedAt: new Date(),
 };
 
 const mockLiabilities: Liabilities = {
-  fixed: [
-    {
-      id: "lib_001",
-      name: "Stripe",
-      amount: 299.00,
-      dueDate: new Date("2026-05-01"),
-      recurring: true,
-      frequency: "monthly",
-      category: "software",
-      autoPayEnabled: true,
-    },
-    {
-      id: "lib_002",
-      name: "AWS Services",
-      amount: 1240.20,
-      dueDate: new Date("2026-04-30"),
-      recurring: true,
-      frequency: "monthly",
-      category: "saas",
-      autoPayEnabled: false,
-    },
-    {
-      id: "lib_003",
-      name: "Notion Labs",
-      amount: 16.00,
-      dueDate: new Date("2026-04-28"),
-      recurring: true,
-      frequency: "monthly",
-      category: "subscription",
-      autoPayEnabled: true,
-    },
-  ],
-  variable: [
-    {
-      id: "lib_004",
-      name: "John Doe",
-      amount: 500.00,
-      dueDate: new Date("2026-04-25"),
-      description: "Dinner split from last week",
-      contactInfo: "john@example.com",
-    },
-    {
-      id: "lib_005",
-      name: "Sarah Chen",
-      amount: 1144.80,
-      dueDate: new Date("2026-05-05"),
-      description: "Conference ticket reimbursement",
-      contactInfo: "+1 555-0123",
-    },
-  ],
+  fixed: [],
+  variable: [],
   expanded: false,
 };
 
@@ -328,7 +233,7 @@ function WeeklyBreakdown({
   onViewFullHistory: () => void;
 }) {
   const fmt = (v: number) =>
-    new Intl.NumberFormat("en-US", { style: "currency", currency: "USD" }).format(v);
+    new Intl.NumberFormat("en-IN", { style: "currency", currency: "INR" }).format(v);
 
   const formatDateRange = (start: string, end: string) => {
     const s = new Date(start);
@@ -419,7 +324,7 @@ const mockDeepLedgerTransactions = generateMockTransactions(60);
 // ─── GhostTable Component ───────────────────────────────────────────────
 function GhostTable({ transactions }: { transactions: TransactionExtended[] }) {
   const fmt = (v: number) =>
-    new Intl.NumberFormat("en-US", { style: "currency", currency: "USD" }).format(v);
+    new Intl.NumberFormat("en-IN", { style: "currency", currency: "INR" }).format(v);
 
   const fmtDate = (d: Date) => {
     const date = new Date(d);
@@ -732,6 +637,10 @@ function PendingInvoicesCard({
   fmt: (v: number) => string;
 }) {
   const totalCount = liabilities.fixed.length + liabilities.variable.length;
+  const pendingTotal = [...liabilities.fixed, ...liabilities.variable].reduce(
+    (sum, item) => sum + item.amount,
+    0,
+  );
 
   const urgencyStyles = (dueDate: Date) => {
     const u = getUrgency(dueDate);
@@ -778,7 +687,7 @@ function PendingInvoicesCard({
             transition={{ delay: 0.2, duration: 0.4 }}
             className="text-[22px] font-semibold tracking-tight tabular-nums text-slate-900"
           >
-            $3,200.00
+            {fmt(pendingTotal)}
           </motion.div>
           <div className="h-9 w-20">
             <ResponsiveContainer width="100%" height="100%">
@@ -910,6 +819,14 @@ export function Dashboard() {
   const [copied, setCopied] = useState(false);
   const [range, setRange] = useState("1W");
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
+  const [trendData, setTrendData] = useState(emptyTrendData);
+  const [categoryData, setCategoryData] = useState(emptyCategoryData);
+  const [budgets, setBudgets] = useState(emptyBudgets);
+  const [totalBalance, setTotalBalance] = useState(0);
+  const [totalIncome, setTotalIncome] = useState(0);
+  const [sparkBalanceData, setSparkBalanceData] = useState(sparkA);
+  const [sparkSpentData, setSparkSpentData] = useState(sparkB);
+  const [sparkIncomeData, setSparkIncomeData] = useState(sparkC);
   const telegramToken = "tg_auth_9x8f2p";
 
   // New state slices for dashboard enhancements
@@ -925,36 +842,96 @@ export function Dashboard() {
   const [monthlySummary, setMonthlySummary] = useState<MonthlySummary>(mockMonthlySummary);
   const [profileModalOpen, setProfileModalOpen] = useState(false);
 
+  // Fetch real data from API — poll every 5s for live bot updates.
   useEffect(() => {
-    const t = setTimeout(() => {
-      const newTx = {
-        id: "tx_" + Math.random().toString(36).slice(2, 9),
-        merchant: "Starbucks",
-        subtitle: "Voice log via Telegram",
-        category: "Coffee",
-        amount: -5.4,
-        time: "Just now",
-        source: "telegram",
-        status: "processing",
-      };
-      setTransactions(prev => [newTx, ...prev]);
+    const load = async () => {
+      try {
+        const res = await fetch("/api/expenses");
+        const data = await res.json();
+        const userId = Object.keys(data)[0];
+        if (!userId) return;
+        const extra = await fetch(`/api/all?user=${userId}`).then(r => r.json()).catch(() => ({}));
+        const expenses = extra.expenses?.length ? extra.expenses : data[userId] || [];
 
-      setTimeout(() => {
-        setInsights(prev => [{
-          id: "ins_" + Math.random().toString(36).slice(2, 9),
-          type: "info",
-          title: "Voice Expense Categorized",
-          content: "$5.40 at Starbucks → Coffee. You've spent $45 on coffee this week, up 12%.",
-          action: "Review budget",
-          time: "now",
-        }, ...prev]);
-        setTransactions(prev => prev.map(tx => tx.id === newTx.id ? { ...tx, status: "completed" } : tx));
-      }, 2500);
-    }, 8000);
-    return () => clearTimeout(t);
+        // Build transactions
+        const txns = expenses.map((e: any, i: number) => {
+          const d = new Date(e.timestamp);
+          const isIncome = e.type === "income" || e.type === "salary" || e.category === "Income";
+          return {
+            id: `tx_${i}`,
+            merchant: e.description,
+            category: e.category,
+            amount: isIncome ? e.amount : -e.amount,
+            time: d.toLocaleTimeString("en-IN", { hour: "2-digit", minute: "2-digit" }),
+            source: e.source === "voice" ? "telegram" : e.source === "image" ? "receipt" : "auto",
+            status: "completed",
+          };
+        }).reverse();
+        setTransactions(txns);
+
+        const metrics = buildDashboardMetrics(expenses);
+        setTrendData(metrics.trendData);
+        setCategoryData(metrics.categoryData);
+        setMonthlySummary(metrics.monthlySummary);
+        setMonthlySpending(prev => ({ ...prev, total: metrics.totalSpent }));
+        setTotalIncome(metrics.totalIncome);
+        setSparkBalanceData(metrics.sparkBalance);
+        setSparkSpentData(metrics.sparkSpent);
+        setSparkIncomeData(metrics.sparkIncome);
+
+        const walletBalance = Object.values(extra.wallets || {}).reduce(
+          (sum: number, wallet: any) => sum + (Number(wallet?.balance) || 0),
+          0,
+        );
+        setTotalBalance(walletBalance);
+
+        const apiBudgets = Object.entries(extra.budgets || {}).map(([label, total]) => {
+          const category = metrics.categoryData.find((item: any) => item.name.toLowerCase() === String(label).toLowerCase());
+          return {
+            label,
+            total: Number(total) || 0,
+            spent: category?.value || 0,
+          };
+        });
+        setBudgets(apiBudgets);
+
+        const topCat = metrics.categoryData[0];
+        if (topCat) {
+          setInsights([{
+            id: "ins_live",
+            type: "info",
+            title: "Live Spending Update",
+            content: `₹${metrics.totalSpent.toLocaleString("en-IN")} spent across ${expenses.length} transactions. Top category: ${topCat.name} (₹${topCat.value.toLocaleString("en-IN")}).`,
+            action: "View breakdown",
+            time: "now",
+          }]);
+        }
+
+        setUserProfile(prev => ({ ...prev, userId, systemIdentifier: `@user_${userId}`, displayName: `User ${userId}` }));
+
+        if (extra.ledger?.length) {
+          const fixed = extra.ledger.filter((e: any) => !e.settled).map((e: any, i: number) => ({
+            id: `led_${i}`,
+            name: `${e.type === "lend" ? "Lent to" : "Borrowed from"} ${e.person}`,
+            amount: e.amount,
+            dueDate: new Date(e.timestamp),
+            recurring: false,
+            frequency: "one-time" as const,
+            category: e.type,
+            autoPayEnabled: false,
+          }));
+          if (fixed.length) setLiabilities(prev => ({ ...prev, fixed }));
+        }
+      } catch (err) {
+        console.error("API fetch error:", err);
+      }
+    };
+    load();
+    const id = setInterval(load, 5000);
+    return () => clearInterval(id);
   }, []);
 
-  const fmt = (v: number) => new Intl.NumberFormat("en-US", { style: "currency", currency: "USD" }).format(v);
+  const fmt = (v: number) => new Intl.NumberFormat("en-IN", { style: "currency", currency: "INR" }).format(v);
 
   const copyToken = () => {
     navigator.clipboard?.writeText(`/start ${telegramToken}`);
@@ -1046,11 +1023,11 @@ export function Dashboard() {
               <>
             {/* KPI strip */}
             <div className="mb-6 grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-4">
-              <Stat title="Total Balance" value="$16,618.00" trend="+12.5%" up data={sparkA} accent="#0F172A" />
+              <Stat title="Total Balance" value={fmt(totalBalance)} trend="" up data={sparkBalanceData} accent="#0F172A" />
               <MonthlySpentCard
-                value="$2,842.50"
+                value={fmt(monthlySpending.total)}
                 trend="-2.4%"
-                data={sparkB}
+                data={sparkSpentData}
                 spending={monthlySpending}
                 onToggle={() =>
                   setMonthlySpending((prev) => ({
@@ -1060,7 +1037,7 @@ export function Dashboard() {
                 }
                 onViewFullHistory={() => setDeepLedgerVisible(true)}
               />
-              <Stat title="Revenue MTD" value="$8,500.00" trend="+18.2%" up data={sparkC} accent="#059669" />
+              <Stat title="Income MTD" value={fmt(totalIncome)} trend="" up data={sparkIncomeData} accent="#059669" />
               <PendingInvoicesCard
                 liabilities={liabilities}
                 onToggle={() => setLiabilities((prev) => ({ ...prev, expanded: !prev.expanded }))}
@@ -1290,7 +1267,7 @@ export function Dashboard() {
                         <div className="h-1.5 w-1.5 rounded-full bg-amber-500" />
                         <span className="text-[11px] font-semibold text-slate-900">Savings Opportunity</span>
                       </div>
-                      <p className="text-[11px] text-slate-500 mb-2 leading-relaxed">We identified $145 in redundant SaaS subscriptions.</p>
+                      <p className="text-[11px] text-slate-500 mb-2 leading-relaxed">We identified ₹145 in redundant subscriptions.</p>
                       <button className="flex items-center gap-1.5 text-[10px] font-medium text-amber-600 hover:text-amber-700">
                         Review subscriptions <ArrowRight size={10} />
                       </button>

@@ -19,8 +19,8 @@ export function Invoices() {
           </div>
           <div className="space-y-3">
             {[
-              { id: 1, name: "AWS Services", amount: "$1,240.20", date: "Due Apr 30", overdue: false },
-              { id: 2, name: "Stripe Processing", amount: "$299.00", date: "Due May 1", overdue: false }
+              { id: 1, name: "AWS Services", amount: "₹1,240.20", date: "Due Apr 30", overdue: false },
+              { id: 2, name: "Stripe Processing", amount: "₹299.00", date: "Due May 1", overdue: false }
             ].map((inv) => (
               <div key={inv.id} className="flex items-center justify-between rounded-lg border border-slate-100 bg-slate-50 p-3">
                 <div className="flex items-center gap-3">

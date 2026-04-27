@@ -4,6 +4,7 @@ import json
 import base64
 import time
 import requests
+from datetime import datetime
 from dotenv import load_dotenv
 
 load_dotenv()
@@ -134,52 +135,56 @@ def normalize_expense_items(raw_details, rates=None):
                 normalized["confidence"] = item.get("confidence")
             if item.get("needs_clarification") is not None:
                 normalized["needs_clarification"] = bool(item.get("needs_clarification"))
+            if item.get("type"):
+                normalized["type"] = item["type"]
             items.append(normalized)
     return items
 
 
 def extract_expense_items(text):
     prompt = f"""
-    Extract every separate expense from this text: "{text}"
-    If the text contains multiple expenses, return one item per expense.
-    If one total amount covers multiple items together, return it as one expense.
-    If a bill was split, keep the paid total in amount and set split.people to the
-    total number of people sharing it, including the user.
-    Detect currency words or symbols. Use INR unless the user clearly says another
-    currency such as USD, AED, EUR, or GBP.
-    If the text is in Malayalam, Tamil, Telugu, Kannada, Hindi, or mixed English,
-    translate each description to concise English before categorization.
+    Extract every financial transaction from this text: "{text}"
+    Today's date is {datetime.now().strftime('%Y-%m-%d')}.
+    This includes EXPENSES, INCOME, SALARY, LOANS, DEBTS, and EMIs.
 
-    Regional mixed-language and slang examples:
-    - "Food-inu 200 spent aayi" means 200 INR on food (Malayalam).
-    - "Njan 350 petrol inu koduthu" means 350 INR on petrol (Malayalam).
-    - "Chaaya kudichu 40 roopa" means 40 INR on tea (Malayalam).
-    - "Groceries-nu 1500 aayi" means 1500 INR on groceries (Malayalam).
-    - "Ola-yil 180 koduthu" means 180 INR on Ola cab (Malayalam).
-    - "Swiggy-yil 300 order cheythu" means 300 INR on food delivery (Malayalam slang).
-    - "Recharge-inu 199 poyi" means 199 INR on phone recharge (Malayalam slang).
-    - "Sapadu ku 180 spend panninen" means 180 INR on meals (Tamil).
-    - "Auto ku 120 kuduthen" means 120 INR on auto transport (Tamil).
-    - "Zomato la 250 order potten" means 250 INR on food delivery (Tamil slang).
-    - "Petrol potta 500" means 500 INR on petrol (Tamil slang).
-    - "Aaj chai aur snacks pe 90 kharch hua" means 90 INR on tea and snacks (Hindi).
-    - "Bhai 200 udaa diye chai pe" means 200 INR on tea (Hindi slang).
-    - "Ola pe 150 laga" means 150 INR on Ola cab (Hindi slang).
-    - "Oota ge 200 kharch aaythu" means 200 INR on food (Kannada).
-    - "Auto ge 80 kotte" means 80 INR on auto transport (Kannada).
-    - "Swiggy alli 350 order maadde" means 350 INR on food delivery (Kannada slang).
-    - "Chai ki 50 icha" means 50 INR on tea (Telugu slang).
-    - "Petrol ki 600 poyindi" means 600 INR on petrol (Telugu slang).
-    - "Dinner 3000 split with 4 people" means amount 3000 and split.people 4.
-    - "Spent 50 dollars on lunch" means amount 50 and currency USD.
+    Rules:
+    - If the text contains multiple items, return one item per transaction.
+    - If one total amount covers multiple items together, return it as one.
+    - If a bill was split, keep the paid total in amount and set split.people.
+    - Detect currency words or symbols. Use INR unless another currency is clear.
+    - If the text is in Malayalam, Tamil, Telugu, Kannada, Hindi, or mixed English,
+      translate each description to concise English.
+    - If the user says "yesterday", "today", "last week", "2 days ago", etc.,
+      compute the actual date and return it in the "date" field (YYYY-MM-DD).
+      If no date is mentioned, return null for "date".
+
+    Transaction type detection:
+    - "salary", "received", "credited", "got paid", "freelance payment", "bonus",
+      "reimbursement", "cashback" → type: "income"
+    - "EMI", "loan payment", "loan repayment", "mortgage" → type: "loan"
+    - "borrowed", "debt", "owe", "lent", "lending" → type: "debt"
+    - Everything else → type: "expense"
+
+    Regional examples:
+    - "Food-inu 200 spent aayi" → 200 INR on food, type expense
+    - "Salary 50000 credited" → 50000 INR salary, type income
+    - "EMI 5000 home loan" → 5000 INR home loan EMI, type loan
+    - "Borrowed 20000 from friend" → 20000 INR borrowed, type debt
+    - "Got 10000 freelance payment" → 10000 INR freelance, type income
+    - "Njan 350 petrol inu koduthu" → 350 INR on petrol, type expense
+    - "Salary vannu 45000" → 45000 INR salary received, type income (Malayalam)
+    - "EMI kattanam 8000" → 8000 INR EMI payment, type loan (Malayalam)
+    - "Dinner 3000 split with 4 people" → 3000 INR, split.people 4, type expense
+    - "Spent 50 dollars on lunch" → 50 USD, type expense
 
     Return ONLY JSON in this exact shape:
     {{
       "detected_language": "ml",
       "expenses": [
-        {{"amount": 356, "currency": "INR", "description": "Rapido travel from Yelahanka to Madiwala"}},
-        {{"amount": 3000, "currency": "INR", "description": "Dinner with friends", "split": {{"people": 4}}}},
-        {{"amount": 50, "currency": "USD", "description": "Lunch"}}
+        {{"amount": 356, "currency": "INR", "description": "Rapido travel", "type": "expense", "date": null}},
+        {{"amount": 50000, "currency": "INR", "description": "Monthly salary", "type": "income", "date": null}},
+        {{"amount": 1500, "currency": "INR", "description": "Dinner yesterday", "type": "expense", "date": "2026-04-26"}},
+        {{"amount": 200, "currency": "INR", "description": "Coffee today", "type": "expense", "date": "2026-04-27"}}
       ]
     }}
     detected_language must be one of: en, hi, ml, ta, te, kn.
@@ -397,6 +402,10 @@ def classify_intent(text):
                 "- dashboard: user wants to open the web dashboard\n"
                 "- language: user wants to change the bot language\n"
                 "- suggestions: user wants spending suggestions or tips per category\n"
+                "- balance: user wants to see wallet balances, how much money they have\n"
+                "- debts: user asks about lending, borrowing, who owes whom\n"
+                "- report: user wants a PDF report of expenses\n"
+                "- treesummary: user wants a category breakdown or tree view of spending\n"
                 "- expense: user is logging a new expense (contains an amount or describes spending)\n"
                 "- unknown: message is unclear or unrelated\n\n"
                 "Return ONLY JSON: {\"intent\": \"<intent>\", \"category\": \"<category if category_query or setbudget else null>\", \"amount\": <number if setbudget else null>, \"period\": \"<today|this_week|last_week|this_month|last_month if date_range_query else null>\"}\n\n"
