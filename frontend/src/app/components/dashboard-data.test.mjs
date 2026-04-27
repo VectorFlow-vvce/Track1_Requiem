@@ -13,6 +13,7 @@ const metrics = buildDashboardMetrics(expenses, new Date("2026-04-27T18:00:00.00
 assert.equal(metrics.totalSpent, 8248);
 assert.equal(metrics.totalIncome, 45000);
 assert.equal(metrics.netCashflow, 36752);
+assert.equal(metrics.totalIncome - metrics.totalSpent, metrics.netCashflow);
 assert.deepEqual(
   metrics.categoryData.map(({ name, value }) => ({ name, value })),
   [
@@ -26,4 +27,3 @@ assert.equal(metrics.trendData.at(-1).spent, 600);
 assert.equal(metrics.trendData.at(-1).income, 0);
 assert.equal(metrics.trendData.at(-1).balance, 36752);
 assert.equal(metrics.monthlySummary.categoryBreakdown.Food, 6838);
-

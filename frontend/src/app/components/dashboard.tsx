@@ -4,7 +4,7 @@ import {
   AreaChart, Area, XAxis, YAxis, Tooltip, ResponsiveContainer,
   BarChart, Bar, Cell, LineChart, Line
 } from "recharts";
-import { buildDashboardMetrics } from "./dashboard-data.js";
+import { buildDashboardMetrics, normalizeCategory } from "./dashboard-data.js";
 import {
   Search, Bell, Plus, ArrowUpRight, ArrowDownRight,
   TrendingUp, Wallet, Target, MessageSquare, Mic, Receipt,
@@ -827,6 +827,7 @@ export function Dashboard() {
   const [sparkBalanceData, setSparkBalanceData] = useState(sparkA);
   const [sparkSpentData, setSparkSpentData] = useState(sparkB);
   const [sparkIncomeData, setSparkIncomeData] = useState(sparkC);
+  const [deepLedgerTransactions, setDeepLedgerTransactions] = useState<TransactionExtended[]>([]);
   const telegramToken = "tg_auth_9x8f2p";
 
   // New state slices for dashboard enhancements
@@ -868,6 +869,21 @@ export function Dashboard() {
           };
         }).reverse();
         setTransactions(txns);
+        setDeepLedgerTransactions(expenses.map((e: any, i: number) => {
+          const d = new Date(e.timestamp);
+          const isIncome = e.type === "income" || e.type === "salary" || e.category === "Income";
+          return {
+            id: `api_${i}`,
+            dateTime: d,
+            category: normalizeCategory(e.category),
+            originEntity: isIncome ? e.description || "Income" : e.source || "Bot",
+            destinationEntity: isIncome ? e.wallet || "Wallet" : e.description || e.category || "Expense",
+            amount: isIncome ? Number(e.amount) || 0 : -(Number(e.amount) || 0),
+            status: "completed",
+            source: e.source === "voice" ? "telegram" : e.source === "image" ? "receipt" : "auto",
+            metadata: e,
+          };
+        }).reverse());
 
         const metrics = buildDashboardMetrics(expenses);
         setTrendData(metrics.trendData);
@@ -883,12 +899,13 @@ export function Dashboard() {
           (sum: number, wallet: any) => sum + (Number(wallet?.balance) || 0),
           0,
         );
-        setTotalBalance(walletBalance);
+        setTotalBalance(walletBalance !== 0 ? walletBalance : metrics.netCashflow);
 
         const apiBudgets = Object.entries(extra.budgets || {}).map(([label, total]) => {
-          const category = metrics.categoryData.find((item: any) => item.name.toLowerCase() === String(label).toLowerCase());
+          const normalizedLabel = normalizeCategory(String(label));
+          const category = metrics.categoryData.find((item: any) => item.name.toLowerCase() === normalizedLabel.toLowerCase());
           return {
-            label,
+            label: normalizedLabel,
             total: Number(total) || 0,
             spent: category?.value || 0,
           };
@@ -932,6 +949,10 @@ export function Dashboard() {
   }, []);
 
   const fmt = (v: number) => new Intl.NumberFormat("en-IN", { style: "currency", currency: "INR" }).format(v);
+  const summaryMonthLabel = new Date(`${monthlySummary.month}-01T00:00:00`).toLocaleDateString("en-US", {
+    month: "long",
+    year: "numeric",
+  });
 
   const copyToken = () => {
     navigator.clipboard?.writeText(`/start ${telegramToken}`);
@@ -1078,7 +1099,7 @@ export function Dashboard() {
                             </linearGradient>
                           </defs>
                           <XAxis dataKey="day" axisLine={false} tickLine={false} tick={{ fontSize: 10, fill: "#94A3B8" }} dy={6} />
-                          <YAxis axisLine={false} tickLine={false} tick={{ fontSize: 10, fill: "#94A3B8" }} tickFormatter={v => `$${v / 1000}k`} width={40} />
+                          <YAxis axisLine={false} tickLine={false} tick={{ fontSize: 10, fill: "#94A3B8" }} tickFormatter={v => `₹${v / 1000}k`} width={40} />
                           <Tooltip
                             cursor={{ stroke: "#E2E8F0", strokeDasharray: 3 }}
                             contentStyle={{ borderRadius: 8, border: "1px solid #E2E8F0", boxShadow: "0 6px 20px rgba(15,23,42,0.06)", fontSize: 11, padding: "6px 10px" }}
@@ -1120,6 +1141,11 @@ export function Dashboard() {
                           <span className="font-medium text-slate-900">{fmt(c.value)}</span>
                         </div>
                       ))}
+                      {categoryData.length === 0 && (
+                        <div className="rounded-lg border border-dashed border-slate-200 bg-slate-50/70 px-3 py-4 text-center text-[11px] text-slate-400">
+                          Waiting for bot categories
+                        </div>
+                      )}
                     </div>
                   </Panel>
                 </div>
@@ -1188,7 +1214,7 @@ export function Dashboard() {
                   </div>
 
                   <div className="flex items-center justify-between border-t border-slate-100 bg-slate-50/50 px-5 py-2.5">
-                    <span className="text-[11px] text-slate-500">{transactions.length} of 142 entries</span>
+                    <span className="text-[11px] text-slate-500">{transactions.length} bot entries</span>
                     <button className="text-[11px] font-medium text-slate-600 hover:text-slate-900">View all →</button>
                   </div>
                 </Panel>
@@ -1198,7 +1224,7 @@ export function Dashboard() {
                   <PanelHeader title="Budget Health" subtitle="Auto-adjusted by ML model" right={<span className="text-[10px] font-medium uppercase tracking-wider text-slate-400">v3.2</span>} />
                   <div className="space-y-3">
                     {budgets.map(b => {
-                      const pct = Math.min(100, (b.spent / b.total) * 100);
+                      const pct = b.total > 0 ? Math.min(100, (b.spent / b.total) * 100) : 0;
                       const over = b.spent > b.total;
                       return (
                         <div key={b.label}>
@@ -1219,6 +1245,11 @@ export function Dashboard() {
                         </div>
                       );
                     })}
+                    {budgets.length === 0 && (
+                      <div className="rounded-lg border border-dashed border-slate-200 bg-slate-50/70 px-3 py-4 text-center text-[11px] text-slate-400">
+                        No bot budgets yet
+                      </div>
+                    )}
                   </div>
                 </Panel>
               </div>
@@ -1284,7 +1315,7 @@ export function Dashboard() {
                       </div>
                       <div>
                         <div className="text-[13px] font-semibold">Monthly Summary</div>
-                        <div className="text-[10px] text-slate-400">April 2026</div>
+                        <div className="text-[10px] text-slate-400">{summaryMonthLabel}</div>
                       </div>
                     </div>
                   </div>
@@ -1319,6 +1350,11 @@ export function Dashboard() {
                               <span className="font-semibold tabular-nums text-slate-900">{fmt(amount)}</span>
                             </div>
                           ))}
+                        {Object.keys(monthlySummary.categoryBreakdown).length === 0 && (
+                          <div className="rounded-lg border border-dashed border-slate-200 bg-slate-50/70 px-3 py-4 text-center text-[11px] text-slate-400">
+                            Waiting for bot expenses
+                          </div>
+                        )}
                       </div>
                     </div>
 
@@ -1370,7 +1406,7 @@ export function Dashboard() {
       <AnimatePresence>
         {deepLedgerVisible && (
           <DeepLedger
-            transactions={mockDeepLedgerTransactions}
+            transactions={deepLedgerTransactions}
             onClose={() => setDeepLedgerVisible(false)}
           />
         )}

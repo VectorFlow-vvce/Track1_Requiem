@@ -371,6 +371,24 @@
             "wallet": "cash",
             "type": "income",
             "timestamp": "2026-04-27T16:18:31.845615"
+        },
+        {
+            "amount": 2500000.0,
+            "category": "Housing",
+            "description": "agricultural loan",
+            "source": "text",
+            "wallet": "cash",
+            "type": "loan",
+            "timestamp": "2026-04-27T16:20:34.427365"
+        },
+        {
+            "amount": 25000.0,
+            "category": "Bills & Utilities",
+            "description": "First installment for agricultural loan",
+            "source": "text",
+            "wallet": "cash",
+            "type": "loan",
+            "timestamp": "2026-04-27T16:21:39.860386"
         }
     ]
 }
