@@ -64,7 +64,7 @@ Talk to the bot in your native language. We support:
 
 ```mermaid
 graph TD
-    A[User Input: Voice/Image/Text] --> B[Telegram Bot]
+    A[User Input: Voice/Image/Text] --> B[Telegram Bot Backend]
     P[Bank Data: Plaid API] --> I
     B --> C{Processing Layer}
     C -->|Voice| D[Wispr/Whisper API]
@@ -78,6 +78,13 @@ graph TD
     J --> K[Telegram Summary/Charts]
     I --> L[Streamlit Web Dashboard]
 ```
+
+---
+
+## 🏗️ Development Division
+This project is built using a collaborative agent-based approach:
+- **Backend & Logic (This Repo):** Full Telegram Bot implementation, API integrations (Wispr, Plaid, OpenAI), and Custom ML pipeline.
+- **UI/UX:** Specialized UI agent focused on the Web Dashboard and Visual Identity.
 
 ---
 
@@ -108,7 +115,7 @@ PLAID_ENV=sandbox
 ```
 
 ### 3. Run the Ecosystem
-**Start the Bot:**
+**Start the Bot Backend:**
 ```bash
 python bot/bot.py
 ```
