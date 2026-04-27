@@ -8,6 +8,58 @@ load_dotenv()
 client = OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
 MODEL = os.getenv("LLM_MODEL", "gpt-4o")
 
+
+def normalize_expense_items(raw_details):
+    if not raw_details:
+        return []
+
+    raw_items = raw_details.get("expenses") if isinstance(raw_details, dict) else raw_details
+    if isinstance(raw_items, dict):
+        raw_items = [raw_items]
+    elif not isinstance(raw_items, list):
+        raw_items = [raw_details]
+
+    items = []
+    for item in raw_items:
+        if not isinstance(item, dict):
+            continue
+        try:
+            amount = float(item.get("amount", 0) or 0)
+        except (TypeError, ValueError):
+            amount = 0
+        description = str(item.get("description") or "").strip()
+        if amount > 0 and description:
+            items.append({"amount": amount, "description": description})
+    return items
+
+
+def extract_expense_items(text):
+    prompt = f"""
+    Extract every separate expense from this text: "{text}"
+    If the text contains multiple expenses, return one item per expense.
+    If one total amount covers multiple items together, return it as one expense.
+    If the text is in Malayalam, Tamil, Telugu, Kannada, Hindi, or mixed English,
+    translate each description to concise English.
+    Return ONLY JSON in this exact shape:
+    {{
+      "expenses": [
+        {{"amount": 356, "description": "Rapido travel from Yelahanka to Madiwala"}},
+        {{"amount": 554, "description": "Uber ride"}}
+      ]
+    }}
+    """
+    try:
+        response = client.chat.completions.create(
+            model=MODEL,
+            messages=[{"role": "user", "content": prompt}],
+            response_format={ "type": "json_object" }
+        )
+        return normalize_expense_items(json.loads(response.choices[0].message.content))
+    except Exception as e:
+        print(f"Error extracting expense items: {e}")
+        return []
+
+
 def extract_expense_details(text):
     prompt = f"""
     Extract the amount and a short description of the expense from this text: "{text}"
@@ -21,7 +73,9 @@ def extract_expense_details(text):
             messages=[{"role": "user", "content": prompt}],
             response_format={ "type": "json_object" }
         )
-        return json.loads(response.choices[0].message.content)
+        details = json.loads(response.choices[0].message.content)
+        items = normalize_expense_items(details)
+        return items[0] if items else {"amount": 0, "description": text}
     except Exception as e:
         print(f"Error extracting expense details: {e}")
         return {"amount": 0, "description": text}

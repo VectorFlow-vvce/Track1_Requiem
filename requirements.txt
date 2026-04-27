@@ -6,7 +6,7 @@ pandas
 plotly
 matplotlib
 python-dotenv
-plaid-python
+requests
 transformers
 torch
 safetensors
