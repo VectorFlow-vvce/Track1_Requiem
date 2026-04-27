@@ -1,11 +1,12 @@
 import logging
 import os
 import asyncio
+import base64
 from telegram import Update
 from telegram.ext import ApplicationBuilder, ContextTypes, CommandHandler, MessageHandler, filters
 from dotenv import load_dotenv
 
-from ai_processor import extract_expense_details
+from ai_processor import extract_expense_details, transcribe_voice, extract_from_receipt
 from categorizer import get_category
 from utils import save_expense
 
@@ -45,6 +46,52 @@ async def handle_text(update: Update, context: ContextTypes.DEFAULT_TYPE):
     else:
         await update.message.reply_text("🤔 I couldn't catch the amount. Try saying something like 'Spent 500 on coffee'.")
 
+async def handle_voice(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    # Indicate processing
+    await context.bot.send_chat_action(chat_id=update.effective_message.chat_id, action="record_voice")
+    
+    voice_file = await update.message.voice.get_file()
+    os.makedirs("assets", exist_ok=True)
+    file_path = f"assets/{update.effective_user.id}_{update.message.message_id}.ogg"
+    await voice_file.download_to_drive(file_path)
+    
+    text = transcribe_voice(file_path)
+    if not text:
+        await update.message.reply_text("❌ Sorry, I couldn't understand the audio.")
+        return
+
+    details = extract_expense_details(text)
+    if details.get('amount', 0) > 0:
+        category = get_category(details['description'])
+        save_expense(update.effective_user.id, details['amount'], category, details['description'], source="voice")
+        await update.message.reply_text(
+            f"🎙️ Heard: \"{text}\"\n"
+            f"✅ Logged ₹{details['amount']} under **{category}**"
+        )
+    else:
+        await update.message.reply_text(f"🎙️ I heard: \"{text}\"\nBut I couldn't find an amount. Try again?")
+
+async def handle_image(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    # Indicate processing
+    await context.bot.send_chat_action(chat_id=update.effective_message.chat_id, action="upload_photo")
+    
+    photo_file = await update.message.photo[-1].get_file()
+    os.makedirs("assets", exist_ok=True)
+    file_path = f"assets/{update.effective_user.id}_{update.message.message_id}.jpg"
+    await photo_file.download_to_drive(file_path)
+    
+    details = extract_from_receipt(file_path)
+    if details.get('amount', 0) > 0:
+        category = get_category(details['description'])
+        save_expense(update.effective_user.id, details['amount'], category, details['description'], source="image")
+        await update.message.reply_text(
+            f"👁️ Receipt Scanned!\n"
+            f"✅ Logged ₹{details['amount']} under **{category}**\n"
+            f"📝 *{details['description']}*"
+        )
+    else:
+        await update.message.reply_text("❌ I couldn't extract the amount from this receipt. Make sure the total is clear.")
+
 if __name__ == '__main__':
     if not TOKEN:
         logger.error("TELEGRAM_BOT_TOKEN not found in environment variables.")
@@ -53,6 +100,8 @@ if __name__ == '__main__':
         
         application.add_handler(CommandHandler('start', start))
         application.add_handler(MessageHandler(filters.TEXT & (~filters.COMMAND), handle_text))
+        application.add_handler(MessageHandler(filters.VOICE, handle_voice))
+        application.add_handler(MessageHandler(filters.PHOTO, handle_image))
         
         logger.info("Bot started...")
         application.run_polling()
