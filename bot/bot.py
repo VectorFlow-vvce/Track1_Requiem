@@ -8,7 +8,6 @@ from telegram.ext import (
 from dotenv import load_dotenv
 
 from ai_processor import (
-    extract_expense_details,
     extract_expense_items,
     transcribe_voice,
     extract_from_receipt,
@@ -35,9 +34,11 @@ from utils import (
     toggle_reminders,
     get_reminder_users,
     user_logged_today,
+    pop_last_expense,
     get_user_language,
     set_user_language,
     build_category_comparison,
+    check_duplicate,
     SUPPORTED_LANGUAGES,
 )
 
@@ -195,6 +196,7 @@ async def help_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     lang = _lang(update)
     await _reply(update,
         "**FineHance Omni Commands**\n\n"
+        "/start - Start the assistant\n"
         "/summary - Spending summary and chart\n"
         "/insights - AI financial insights\n"
         "/subscriptions - View recurring expenses\n"
@@ -223,7 +225,7 @@ async def language(update: Update, context: ContextTypes.DEFAULT_TYPE):
         for code, name in SUPPORTED_LANGUAGES.items()
     ]
     await update.message.reply_text(
-        "🌍 **Choose your language / भाषा चुनें / ഭാഷ തിരഞ്ഞെടുക്കുക**",
+        "🌍 **Choose your language / भाषा चुनें / ഭാഷ തിരഞ്ഞെടുക്കുക / மொழியைத் தேர்ந்தெடுங்கள் / భాషను ఎంచుకోండి / ಭಾಷೆಯನ್ನು ಆಯ್ಕೆಮಾಡಿ**",
         reply_markup=InlineKeyboardMarkup(buttons),
         parse_mode='Markdown',
     )
@@ -271,6 +273,12 @@ async def _dispatch_intent(voice_cmd, update, context):
             context.args = []
         await setbudget(update, context)
         return True
+    if cmd == 'date_range_query':
+        await handle_date_range_query(update, context, voice_cmd.get('period', 'this_month'), voice_cmd.get('category', ''))
+        return True
+    if cmd == 'edit_expense':
+        await handle_edit_expense(update, context, voice_cmd.get('field', 'amount'), voice_cmd.get('value', ''))
+        return True
     return False
 
 
@@ -299,17 +307,59 @@ async def handle_text(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await context.bot.send_chat_action(chat_id=update.effective_message.chat_id, action="typing")
 
     items, detected = extract_expense_items(text)
-    # Auto-set language from expense text
     if detected and detected != "en" and lang == "en":
         set_user_language(user_id, detected)
         lang = detected
+
+    if not items:
+        await _reply(update, "🤔 I couldn't catch the amount. Try saying something like 'Spent 500 on coffee'.", lang)
+        return
+
+    # Check for large amounts needing confirmation
+    large = [i for i in items if i['amount'] >= 10000]
+    if large and not context.user_data.get('confirmed_large'):
+        context.user_data['pending_items'] = items
+        context.user_data['pending_source'] = 'text'
+        context.user_data['pending_lang'] = lang
+        desc = large[0]['description']
+        amt = large[0]['amount']
+        buttons = [[InlineKeyboardButton("✅ Yes, log it", callback_data="confirm:yes"),
+                    InlineKeyboardButton("❌ Cancel", callback_data="confirm:no")]]
+        await update.message.reply_text(
+            f"⚠️ **₹{amt:,.0f}** on *{desc}* — that's a large amount. Confirm?",
+            reply_markup=InlineKeyboardMarkup(buttons), parse_mode='Markdown',
+        )
+        return
+    context.user_data.pop('confirmed_large', None)
+
+    # Check for duplicates
+    for item in items:
+        dup = check_duplicate(user_id, item['amount'], item['description'])
+        if dup:
+            context.user_data['pending_items'] = items
+            context.user_data['pending_source'] = 'text'
+            context.user_data['pending_lang'] = lang
+            buttons = [[InlineKeyboardButton("✅ Log anyway", callback_data="confirm:yes"),
+                        InlineKeyboardButton("❌ Skip", callback_data="confirm:no")]]
+            await update.message.reply_text(
+                f"🔄 This looks like a duplicate of a recent entry:\n₹{dup['amount']:,.0f} - {dup['description']}\nLog again?",
+                reply_markup=InlineKeyboardMarkup(buttons), parse_mode='Markdown',
+            )
+            return
+
     logged = log_expense_items(user_id, items, source="text")
     if logged:
         response = build_logged_message(logged)
         for item in logged:
             alert = check_budget_exceeded(user_id, item['category'])
             if alert:
-                response += f"\n\n⚠️ **Budget Alert!**\n{alert['category']}: ₹{alert['spent']:,.0f} / ₹{alert['limit']:,.0f} ({alert['percentage']:.0f}%)"
+                if alert['exceeded']:
+                    response += f"\n\n🚨 **Budget Exceeded!**\n{alert['category']}: ₹{alert['spent']:,.0f} / ₹{alert['limit']:,.0f} ({alert['percentage']:.0f}%)"
+                else:
+                    response += f"\n\n⚠️ **Budget Warning!**\n{alert['category']}: ₹{alert['spent']:,.0f} / ₹{alert['limit']:,.0f} ({alert['percentage']:.0f}%)"
+        velocity = check_spending_velocity(user_id)
+        if velocity:
+            response += f"\n\n🏎️ **Spending Alert:** You've spent ₹{velocity['today']:,.0f} today — {velocity['ratio']}x your daily average of ₹{velocity['average']:,.0f}"
         await _reply(update, response, lang)
     else:
         await _reply(update, "🤔 I couldn't catch the amount. Try saying something like 'Spent 500 on coffee'.", lang)
@@ -325,6 +375,7 @@ async def handle_voice(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await voice_file.download_to_drive(file_path)
 
     text = transcribe_voice(file_path)
+    os.remove(file_path)
     if not text:
         await _reply(update, "❌ Sorry, I couldn't understand the audio.", lang)
         return
@@ -355,6 +406,7 @@ async def handle_image(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await photo_file.download_to_drive(file_path)
 
     details = extract_from_receipt(file_path)
+    os.remove(file_path)
     if receipt_needs_clarification(details):
         await _reply(update, "I'm having trouble reading that receipt. Can you just tell me the total amount?", lang)
         return
@@ -384,7 +436,8 @@ async def summary(update: Update, context: ContextTypes.DEFAULT_TYPE):
         with open(chart_path, 'rb') as chart_file:
             caption = translate_response("📊 **Your Financial Snapshot**", lang)
             await update.message.reply_photo(photo=chart_file, caption=caption, parse_mode='Markdown')
-        await update.message.reply_text(f"🧠 **AI Summary**\n\n{advice}", parse_mode='Markdown')
+        header = translate_response("🧠 **AI Summary**", lang)
+        await update.message.reply_text(f"{header}\n\n{advice}", parse_mode='Markdown')
     else:
         await _reply(update, "📉 No data yet! Log some expenses first to see your summary.", lang)
 
@@ -401,17 +454,25 @@ async def insights(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await context.bot.send_chat_action(chat_id=update.effective_message.chat_id, action="typing")
     advice = generate_insights(expenses)
     advice = translate_response(advice, lang)
-    await update.message.reply_text(f"🧠 **AI Financial Insights**\n\n{advice}", parse_mode='Markdown')
+    header = translate_response("🧠 **AI Financial Insights**", lang)
+    await update.message.reply_text(f"{header}\n\n{advice}", parse_mode='Markdown')
 
 
 async def dashboard(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    await _reply(update,
+    user_id = update.effective_user.id
+    link = f"http://localhost:8501/?user={user_id}"
+    keyboard = InlineKeyboardMarkup([
+        [InlineKeyboardButton("📊 Open Dashboard", url=link)]
+    ])
+    lang = _lang(update)
+    text = translate_response(
         "🖥️ **Your Command Center**\n"
-        "View your full financial analytics here:\n"
-        "🔗 [Open Dashboard](http://localhost:8501)\n\n"
-        "*(Note: Ensure the dashboard is running locally during the demo)*",
-        _lang(update),
+        "View your full financial analytics here:\n\n"
+        f"`{link}`\n\n"
+        "_(Tap the button or copy the link above)_",
+        lang,
     )
+    await update.message.reply_text(text, parse_mode='Markdown', reply_markup=keyboard)
 
 
 async def subscriptions(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -547,7 +608,8 @@ async def suggestions(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await context.bot.send_chat_action(chat_id=update.effective_message.chat_id, action="typing")
     advice = generate_suggestions(cat_stats)
     advice = translate_response(advice, lang)
-    await update.message.reply_text(f"💡 **Spending Suggestions**\n\n{advice}", parse_mode='Markdown')
+    header = translate_response("💡 **Spending Suggestions**", lang)
+    await update.message.reply_text(f"{header}\n\n{advice}", parse_mode='Markdown')
 
 
 async def send_evening_reminders(context: ContextTypes.DEFAULT_TYPE):
@@ -594,27 +656,111 @@ async def handle_category_query(update: Update, context: ContextTypes.DEFAULT_TY
     )
 
 
+async def handle_date_range_query(update: Update, context: ContextTypes.DEFAULT_TYPE, period: str, category: str = ''):
+    user_id = update.effective_user.id
+    lang = _lang(update)
+    expenses = load_expenses().get(str(user_id), [])
+    if not expenses:
+        await _reply(update, "📭 No expenses logged yet!", lang)
+        return
+    filtered = filter_expenses_by_range(expenses, period)
+    if category:
+        filtered = [e for e in filtered if category.lower() in e.get('category', '').lower()]
+    if not filtered:
+        label = period.replace('_', ' ')
+        await _reply(update, f"📭 No expenses found for {label}" + (f" on {category}" if category else ""), lang)
+        return
+    total = sum(e['amount'] for e in filtered)
+    count = len(filtered)
+    label = period.replace('_', ' ')
+    cats = {}
+    for e in filtered:
+        cats[e.get('category', 'Other')] = cats.get(e.get('category', 'Other'), 0) + e['amount']
+    top_cats = sorted(cats.items(), key=lambda x: x[1], reverse=True)[:5]
+    lines = [f"📊 **Spending {label}**" + (f" on {category}" if category else "") + f"\n",
+             f"💰 Total: **₹{total:,.0f}** ({count} transaction{'s' if count != 1 else ''})\n"]
+    if not category:
+        for cat, amt in top_cats:
+            lines.append(f"• {cat}: ₹{amt:,.0f}")
+    await _reply(update, "\n".join(lines), lang)
+
+
+async def handle_edit_expense(update: Update, context: ContextTypes.DEFAULT_TYPE, field: str, value: str):
+    user_id = update.effective_user.id
+    lang = _lang(update)
+    result = edit_last_expense(user_id, field, value)
+    if not result:
+        await _reply(update, "📭 No expenses to edit!", lang)
+        return
+    await _reply(update,
+        f"✏️ Updated last expense:\n**{result['field']}**: {result['old']} → {result['new']}",
+        lang,
+    )
+
+
 async def delete_last_expense(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user_id = update.effective_user.id
     lang = _lang(update)
     expenses = load_expenses()
     user_key = str(user_id)
-
     if user_key not in expenses or not expenses[user_key]:
         await _reply(update, "📭 No expenses to delete!", lang)
         return
-
-    last_expense = expenses[user_key].pop()
-
-    import json
-    data_file = os.path.join(os.path.dirname(__file__), '../data/expenses.json')
-    with open(data_file, 'w') as f:
-        json.dump(expenses, f, indent=4)
-
-    await _reply(update,
-        f"✅ Deleted: ₹{last_expense['amount']:,.0f} - {last_expense['description']}",
+    last = expenses[user_key][-1]
+    text = translate_response(
+        f"🗑️ Delete this expense?\n₹{last['amount']:,.0f} - {last['description']}\n({last.get('category', 'Unknown')})",
         lang,
     )
+    buttons = [[InlineKeyboardButton("✅ Yes, delete", callback_data="del:yes"),
+                InlineKeyboardButton("❌ Cancel", callback_data="del:no")]]
+    await update.message.reply_text(text, reply_markup=InlineKeyboardMarkup(buttons), parse_mode='Markdown')
+
+
+async def delete_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    query = update.callback_query
+    await query.answer()
+    if query.data == "del:yes":
+        user_id = query.from_user.id
+        expenses = load_expenses()
+        user_key = str(user_id)
+        if user_key in expenses and expenses[user_key]:
+            last = expenses[user_key].pop()
+            from utils import _atomic_write, DATA_FILE
+            _atomic_write(DATA_FILE, expenses)
+            lang = get_user_language(user_id)
+            text = translate_response(f"✅ Deleted: ₹{last['amount']:,.0f} - {last['description']}", lang)
+            await query.edit_message_text(text, parse_mode='Markdown')
+        else:
+            await query.edit_message_text("📭 Nothing to delete.")
+    else:
+        await query.edit_message_text("❌ Cancelled.")
+
+
+async def confirm_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    query = update.callback_query
+    await query.answer()
+    if query.data == "confirm:yes":
+        items = context.user_data.pop('pending_items', [])
+        source = context.user_data.pop('pending_source', 'text')
+        lang = context.user_data.pop('pending_lang', 'en')
+        context.user_data['confirmed_large'] = True
+        user_id = query.from_user.id
+        logged = log_expense_items(user_id, items, source=source)
+        if logged:
+            text = build_logged_message(logged)
+            velocity = check_spending_velocity(user_id)
+            if velocity:
+                text += f"\n\n🏎️ **Spending Alert:** ₹{velocity['today']:,.0f} today — {velocity['ratio']}x your daily avg"
+            text = translate_response(text, lang)
+            await query.edit_message_text(text, parse_mode='Markdown')
+        else:
+            await query.edit_message_text("❌ Failed to log.")
+        context.user_data.pop('confirmed_large', None)
+    else:
+        context.user_data.pop('pending_items', None)
+        context.user_data.pop('pending_source', None)
+        context.user_data.pop('pending_lang', None)
+        await query.edit_message_text("❌ Cancelled.")
 
 
 async def setup_bot_commands(application):
@@ -643,6 +789,8 @@ if __name__ == '__main__':
         application.add_handler(CommandHandler('suggestions', suggestions))
         application.add_handler(CommandHandler('dashboard', dashboard))
         application.add_handler(CallbackQueryHandler(language_callback, pattern=r"^lang:"))
+        application.add_handler(CallbackQueryHandler(delete_callback, pattern=r"^del:"))
+        application.add_handler(CallbackQueryHandler(confirm_callback, pattern=r"^confirm:"))
         application.add_handler(MessageHandler(filters.TEXT, handle_text))
         application.add_handler(MessageHandler(filters.VOICE, handle_voice))
         application.add_handler(MessageHandler(filters.PHOTO, handle_image))

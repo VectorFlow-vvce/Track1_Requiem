@@ -44,7 +44,7 @@ def load_data():
         with open(DATA_PATH, 'r') as f:
             try:
                 return json.load(f)
-            except:
+            except Exception:
                 return {}
     return {}
 
@@ -53,13 +53,39 @@ data = load_data()
 if not data:
     st.info("👋 No data yet! Start logging expenses via the Telegram Bot.")
 else:
-    # Sidebar selection
+    # Support ?user=ID query param for direct links from the bot
     user_ids = list(data.keys())
-    selected_user = st.sidebar.selectbox("Select User ID", user_ids)
+    query_user = st.query_params.get("user")
+    if query_user and query_user in user_ids:
+        selected_user = query_user
+        st.sidebar.success(f"Viewing data for user `{selected_user}`")
+    else:
+        selected_user = st.sidebar.selectbox("Select User ID", user_ids)
+    date_range = st.sidebar.selectbox("Date Range", ["All Time", "Today", "This Week", "Last Week", "This Month", "Last Month"])
     
     if selected_user:
         df = pd.DataFrame(data[selected_user])
         df['timestamp'] = pd.to_datetime(df['timestamp'])
+        
+        today = pd.Timestamp.now().normalize()
+        if date_range == "Today":
+            df = df[df['timestamp'].dt.date == today.date()]
+        elif date_range == "This Week":
+            start = today - pd.Timedelta(days=today.weekday())
+            df = df[df['timestamp'] >= start]
+        elif date_range == "Last Week":
+            start = today - pd.Timedelta(days=today.weekday() + 7)
+            end = start + pd.Timedelta(days=6)
+            df = df[(df['timestamp'] >= start) & (df['timestamp'] <= end + pd.Timedelta(days=1))]
+        elif date_range == "This Month":
+            df = df[(df['timestamp'].dt.month == today.month) & (df['timestamp'].dt.year == today.year)]
+        elif date_range == "Last Month":
+            last = today - pd.DateOffset(months=1)
+            df = df[(df['timestamp'].dt.month == last.month) & (df['timestamp'].dt.year == last.year)]
+        
+        if df.empty:
+            st.warning(f"No expenses found for {date_range}.")
+            st.stop()
         
         # Metrics
         total_spent = df['amount'].sum()

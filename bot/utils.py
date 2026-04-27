@@ -1,6 +1,7 @@
 import json
 import os
-from datetime import datetime
+from datetime import datetime, timedelta
+import tempfile
 import matplotlib.pyplot as plt
 import pandas as pd
 from matplotlib.ticker import FuncFormatter
@@ -23,6 +24,18 @@ SUPPORTED_LANGUAGES = {
 DEFAULT_LANGUAGE = "en"
 
 
+def _atomic_write(path, data):
+    os.makedirs(os.path.dirname(path), exist_ok=True)
+    fd, tmp = tempfile.mkstemp(dir=os.path.dirname(path), suffix='.tmp')
+    try:
+        with os.fdopen(fd, 'w') as f:
+            json.dump(data, f, indent=4)
+        os.replace(tmp, path)
+    except BaseException:
+        os.unlink(tmp)
+        raise
+
+
 def load_languages():
     if not os.path.exists(LANG_FILE):
         return {}
@@ -40,9 +53,7 @@ def get_user_language(user_id):
 def set_user_language(user_id, lang_code):
     data = load_languages()
     data[str(user_id)] = lang_code
-    os.makedirs(os.path.dirname(LANG_FILE), exist_ok=True)
-    with open(LANG_FILE, 'w') as f:
-        json.dump(data, f, indent=4)
+    _atomic_write(LANG_FILE, data)
 
 def load_expenses():
     if not os.path.exists(DATA_FILE):
@@ -70,12 +81,25 @@ def save_expense(user_id, amount, category, description, source="text", metadata
         expense.update(metadata)
 
     data[user_key].append(expense)
-    
-    with open(DATA_FILE, 'w') as f:
-        json.dump(data, f, indent=4)
+
+    _atomic_write(DATA_FILE, data)
     
     # Update gamification
     update_gamification(user_id)
+
+
+def check_duplicate(user_id, amount, description, window_minutes=10):
+    expenses = load_expenses().get(str(user_id), [])
+    if not expenses:
+        return None
+    now = datetime.now()
+    for i, e in enumerate(reversed(expenses)):
+        ts = datetime.fromisoformat(e['timestamp'])
+        if (now - ts).total_seconds() > window_minutes * 60:
+            break
+        if abs(e['amount'] - amount) < 0.01 and e['description'].lower().strip() == description.lower().strip():
+            return e
+    return None
 
 
 def _empty_forecast(method="insufficient_data"):
@@ -341,7 +365,7 @@ def detect_subscriptions(user_id):
         if len(dates) < 2:
             continue
         
-        gaps = [(dates[i+1] - dates[i]).days for i in range(len(dates)-1)]
+        gaps = [int((pd.Timestamp(dates[i+1]) - pd.Timestamp(dates[i])).days) for i in range(len(dates)-1)]
         avg_gap = sum(gaps) / len(gaps)
         
         if 20 <= avg_gap <= 40:
@@ -374,38 +398,44 @@ def save_budget(user_id, category, amount):
         budgets[user_key] = {}
     budgets[user_key][category] = float(amount)
     
-    os.makedirs(os.path.dirname(BUDGETS_FILE), exist_ok=True)
-    with open(BUDGETS_FILE, 'w') as f:
-        json.dump(budgets, f, indent=4)
+    _atomic_write(BUDGETS_FILE, budgets)
 
 
 def check_budget_exceeded(user_id, category):
     budgets = load_budgets().get(str(user_id), {})
     if category not in budgets:
         return None
-    
     limit = budgets[category]
     expenses = load_expenses().get(str(user_id), [])
-    
     current_month = datetime.now().month
     current_year = datetime.now().year
-    
     month_total = sum(
         e['amount'] for e in expenses
         if e['category'] == category
         and datetime.fromisoformat(e['timestamp']).month == current_month
         and datetime.fromisoformat(e['timestamp']).year == current_year
     )
-    
-    if month_total > limit:
+    percentage = (month_total / limit) * 100 if limit > 0 else 0
+    if percentage >= 80:
         return {
-            'category': category,
-            'spent': month_total,
-            'limit': limit,
-            'exceeded_by': month_total - limit,
-            'percentage': (month_total / limit) * 100
+            'category': category, 'spent': month_total, 'limit': limit,
+            'exceeded_by': max(0, month_total - limit), 'percentage': percentage,
+            'exceeded': month_total > limit,
         }
     return None
+
+
+def get_user_budgets(user_id):
+    return load_budgets().get(str(user_id), {})
+
+def delete_budget(user_id, category):
+    budgets = load_budgets()
+    user_key = str(user_id)
+    if user_key in budgets and category in budgets[user_key]:
+        del budgets[user_key][category]
+        _atomic_write(BUDGETS_FILE, budgets)
+        return True
+    return False
 
 
 def generate_csv_export(user_id):
@@ -473,8 +503,7 @@ def update_gamification(user_id):
         user_data['badges'].append('100-logs')
     
     os.makedirs(os.path.dirname(GAMIFICATION_FILE), exist_ok=True)
-    with open(GAMIFICATION_FILE, 'w') as f:
-        json.dump(data, f, indent=4)
+    _atomic_write(GAMIFICATION_FILE, data)
     
     return user_data
 
@@ -518,9 +547,7 @@ def load_reminders():
 
 
 def save_reminders(data):
-    os.makedirs(os.path.dirname(REMINDERS_FILE), exist_ok=True)
-    with open(REMINDERS_FILE, 'w') as f:
-        json.dump(data, f, indent=4)
+    _atomic_write(REMINDERS_FILE, data)
 
 
 def toggle_reminders(user_id, chat_id):
@@ -537,6 +564,78 @@ def toggle_reminders(user_id, chat_id):
 
 def get_reminder_users():
     return load_reminders()
+
+
+def filter_expenses_by_range(expenses, range_key):
+    if not expenses or not range_key:
+        return expenses
+    now = datetime.now()
+    today = now.date()
+    if range_key == 'today':
+        start = today
+        end = today
+    elif range_key == 'this_week':
+        start = today - timedelta(days=today.weekday())
+        end = today
+    elif range_key == 'last_week':
+        start = today - timedelta(days=today.weekday() + 7)
+        end = start + timedelta(days=6)
+    elif range_key == 'this_month':
+        start = today.replace(day=1)
+        end = today
+    elif range_key == 'last_month':
+        first_of_month = today.replace(day=1)
+        last_month_end = first_of_month - timedelta(days=1)
+        start = last_month_end.replace(day=1)
+        end = last_month_end
+    else:
+        return expenses
+    return [e for e in expenses if start <= datetime.fromisoformat(e['timestamp']).date() <= end]
+
+
+def check_spending_velocity(user_id):
+    expenses = load_expenses().get(str(user_id), [])
+    if len(expenses) < 5:
+        return None
+    today = datetime.now().date()
+    today_total = sum(e['amount'] for e in expenses if datetime.fromisoformat(e['timestamp']).date() == today)
+    past_days = {}
+    for e in expenses:
+        d = datetime.fromisoformat(e['timestamp']).date()
+        if d < today:
+            past_days.setdefault(d, 0)
+            past_days[d] += e['amount']
+    if not past_days:
+        return None
+    avg_daily = sum(past_days.values()) / len(past_days)
+    if avg_daily > 0 and today_total > avg_daily * 2:
+        return {'today': today_total, 'average': avg_daily, 'ratio': round(today_total / avg_daily, 1)}
+    return None
+
+
+def edit_last_expense(user_id, field, value):
+    data = load_expenses()
+    user_key = str(user_id)
+    if user_key not in data or not data[user_key]:
+        return None
+    expense = data[user_key][-1]
+    old_value = expense.get(field)
+    if field == 'amount':
+        value = float(value)
+    expense[field] = value
+    _atomic_write(DATA_FILE, data)
+    return {'field': field, 'old': old_value, 'new': value, 'expense': expense}
+
+
+def pop_last_expense(user_id):
+    """Remove and return the last expense for a user. Returns the expense dict or None."""
+    data = load_expenses()
+    user_key = str(user_id)
+    if user_key not in data or not data[user_key]:
+        return None
+    last = data[user_key].pop()
+    _atomic_write(DATA_FILE, data)
+    return last
 
 
 def user_logged_today(user_id):

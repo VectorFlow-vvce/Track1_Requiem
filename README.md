@@ -131,8 +131,9 @@ streamlit run dashboard/app.py
 
 ---
 
-## 👨‍💻 Author
+## 👨‍💻 Authors
+**Kashyap Dayal**  
 **Navaneeth K (CyberKunju)**  
-*FineHance Categorization Model Creator & Full-Stack Developer*
+**Chethas Dileep**
 
 [Hugging Face Profile](https://huggingface.co/CyberKunju) | [GitHub](https://github.com/Dawn-Fighter)

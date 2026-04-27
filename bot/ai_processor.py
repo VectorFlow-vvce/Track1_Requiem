@@ -199,34 +199,6 @@ def extract_expense_items(text):
         return [], "en"
 
 
-def extract_expense_details(text):
-    prompt = f"""
-    Extract the amount and a short description of the expense from this text: "{text}"
-    If a bill was split, keep the paid total in amount and set split.people to the
-    total number of people sharing it, including the user.
-    Detect currency words or symbols. Use INR unless another currency is clear.
-    If the text is in Malayalam, Tamil, Telugu, Kannada, Hindi, or mixed English,
-    translate the description to English.
-    Examples:
-    - "Food-inu 200 spent aayi" -> {{"amount": 200, "currency": "INR", "description": "Food"}}
-    - "Sapadu ku 180 spend panninen" -> {{"amount": 180, "currency": "INR", "description": "Meal"}}
-    - "Dinner 3000 split with 4 people" -> {{"amount": 3000, "currency": "INR", "description": "Dinner with friends", "split": {{"people": 4}}}}
-    - "Spent 50 dollars on lunch" -> {{"amount": 50, "currency": "USD", "description": "Lunch"}}
-    Return ONLY a JSON object with keys "amount" (number), "currency" (string), and "description" (string). Include "split" only when applicable.
-    """
-    try:
-        response = client.chat.completions.create(
-            model=MODEL,
-            messages=[{"role": "user", "content": prompt}],
-            response_format={ "type": "json_object" }
-        )
-        details = json.loads(response.choices[0].message.content)
-        items = normalize_expense_items(details)
-        return items[0] if items else {"amount": 0, "description": text}
-    except Exception as e:
-        print(f"Error extracting expense details: {e}")
-        return {"amount": 0, "description": text}
-
 def transcribe_voice(file_path):
     try:
         with open(file_path, "rb") as audio_file:
@@ -399,26 +371,6 @@ def translate_response(text, lang):
         return text
 
 
-def detect_language(text):
-    """Quick detect of language from user text. Returns lang code or None."""
-    if not text:
-        return None
-    try:
-        response = client.chat.completions.create(
-            model=MODEL,
-            messages=[{"role": "user", "content": (
-                "Detect the language of this text. Return ONLY one of these codes: "
-                "en, hi, ml, ta, te, kn. If unsure or mixed with English, return the "
-                "non-English language code. If purely English, return en.\n\n"
-                f'"{text}"'
-            )}],
-        )
-        code = response.choices[0].message.content.strip().lower()[:2]
-        return code if code in LANG_NAMES else None
-    except Exception:
-        return None
-
-
 def classify_intent(text):
     """Use LLM to classify user text into a bot command intent or expense."""
     if not text:
@@ -435,6 +387,7 @@ def classify_intent(text):
                 "- help: user asks what the bot can do, how to use it\n"
                 "- start: user wants to restart or begin fresh\n"
                 "- category_query: user asks how much they spent on a specific category (extract the category)\n"
+                "- date_range_query: user asks about spending in a time period like this week, last month, today (extract the period)\n"
                 "- delete_last: user wants to undo/remove/delete their last expense\n"
                 "- subscriptions: user asks about recurring expenses\n"
                 "- setbudget: user wants to set a spending budget/limit for a category (extract category and amount)\n"
@@ -446,7 +399,7 @@ def classify_intent(text):
                 "- suggestions: user wants spending suggestions or tips per category\n"
                 "- expense: user is logging a new expense (contains an amount or describes spending)\n"
                 "- unknown: message is unclear or unrelated\n\n"
-                "Return ONLY JSON: {\"intent\": \"<intent>\", \"category\": \"<category if category_query or setbudget else null>\", \"amount\": <number if setbudget else null>}\n\n"
+                "Return ONLY JSON: {\"intent\": \"<intent>\", \"category\": \"<category if category_query or setbudget else null>\", \"amount\": <number if setbudget else null>, \"period\": \"<today|this_week|last_week|this_month|last_month if date_range_query else null>\"}\n\n"
                 f"Message: \"{text}\""
             )}],
             response_format={"type": "json_object"},
@@ -463,6 +416,11 @@ def classify_intent(text):
                 out["category"] = result["category"]
             if result.get("amount") is not None:
                 out["amount"] = result["amount"]
+        if intent == "date_range_query":
+            if result.get("period"):
+                out["period"] = result["period"]
+            if result.get("category"):
+                out["category"] = result["category"]
         return out
     except Exception as e:
         print(f"Error classifying intent: {e}")
