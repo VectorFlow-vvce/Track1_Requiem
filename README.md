@@ -1,7 +1,7 @@
-
 <div align="center">
 
-### <img src="frontend/logo.svg" height="28" style="vertical-align: middle; margin-right: 8px;"/> The Frictionless, Multimodal Financial Intelligence Ecosystem
+# Requiem: FineHance Omni
+### 🏆 **1st Place Winner (Track 1) — VVCE Hackathon**
 
 [![GitHub License](https://img.shields.io/badge/license-Apache%202.0-blue.svg)](LICENSE)
 [![Python 3.10+](https://img.shields.io/badge/python-3.10+-blue.svg)](https://www.python.org/downloads/)
@@ -9,78 +9,53 @@
 [![Vite](https://img.shields.io/badge/Vite-4-646CFF.svg?logo=vite)](https://vitejs.dev/)
 [![Custom ML Accuracy](https://img.shields.io/badge/ML--Accuracy-96.56%25-green.svg)](https://huggingface.co/CyberKunju/finehance-categorizer-minilm)
 
-*FineHance Omni* is a next-generation financial assistant designed to completely eliminate the friction of expense tracking. By uniting *Voice Automation, **Receipt Vision, a **Custom Transformer Model, **Setu Open Banking, and a **Stunning Modern Web Dashboard*, it captures every rupee of your spending with zero effort and provides proactive, professional-grade financial insights.
+**FineHance Omni** is an advanced, multimodal financial intelligence ecosystem developed by **Team Requiem**. Designed to eliminate the friction of personal finance management, it integrates voice automation, receipt vision, and custom transformer models into a seamless, professional-grade dashboard.
 
-[Explore the Custom ML Model](https://huggingface.co/CyberKunju/finehance-categorizer-minilm) • [Report Bug](https://github.com/Dawn-Fighter/finehance-omni/issues) • [Request Feature](https://github.com/Dawn-Fighter/finehance-omni/issues)
+[Explore the ML Model](https://huggingface.co/CyberKunju/finehance-categorizer-minilm) • [Report Bug](https://github.com/Dawn-Fighter/finehance-omni/issues) • [Request Feature](https://github.com/Dawn-Fighter/finehance-omni/issues)
 
 </div>
 
+---
+
+## 🌟 Overview
+
+FineHance Omni was engineered to solve the "tracking fatigue" that plagues traditional financial apps. By leveraging high-performance AI, we've built a system that captures every rupee with zero manual entry, providing users with actionable, proactive financial insights through natural language and vision.
+
 ## 🚀 Key Features
 
-### 🎙️ 1. Voice-to-Finance (Powered by Wispr)
-Don't type. Just say: *"Hey, I just spent 1200 on petrol at Shell."* 
-FineHance Omni transcribes the audio, extracts the amount, and uses a specialized model to categorize it in milliseconds.
+### 🎙️ 1. Voice-to-Finance (Wispr Powered)
+Eliminate typing. Users can log expenses using natural language: *"Hey, I just spent 1200 on petrol at Shell."* The system performs real-time transcription, entity extraction, and automated categorization in milliseconds.
 
 ### 👁️ 2. Receipt Vision (GPT-4o)
-Snap a photo of any thermal receipt or invoice. The system itemizes the entire purchase, extracting:
-- Individual line items
-- Total amount & Taxes
-- Merchant name & Date
+Advanced OCR and document understanding for thermal receipts and invoices. The system automatically itemizes purchases, extracting merchant metadata, tax components, and individual line items with high precision.
 
 ### 🧠 3. Custom ML Categorization
-Unlike generic trackers, we use a specialized, fine-tuned **MiniLM-L6 Transformer** model:
+Powered by a fine-tuned **MiniLM-L6 Transformer** model, ensuring enterprise-grade accuracy without the latency of general-purpose LLMs.
 - **Model:** `CyberKunju/finehance-categorizer-minilm`
-- **Precision:** **96.56% Accuracy** across 23 distinct financial categories.
-- **Latency:** Ultra-fast inference (~6,600 samples/sec).
+- **Performance:** **96.56% Accuracy** across 23 financial categories.
+- **Efficiency:** Ultra-fast inference (~6,600 samples/sec).
 
-### 🏦 4. Automated Indian Bank Sync (Setu)
-Powered by the **Setu Account Aggregator** framework.
-- **UPI Integration:** Automatically pulls transactions from HDFC, SBI, ICICI, etc.
-- **Real-time Reconciliation:** Matches manual logs with bank-direct transactions.
-- **Subscription Detection:** Identifies recurring "vampire" payments automatically.
+### 🌍 4. Multilingual Intelligence
+Full support for major South Indian languages, enabling inclusive financial tools for a diverse user base:
+- **Malayalam, Tamil, Telugu, Kannada, Hindi, and English.**
 
-### 🌍 5. South Indian Multilingual Support
-Talk to the bot in your native language. We support:
-- **Malayalam (മലയാളം)**, **Tamil (தமிழ்)**, **Telugu (తెలుగు)**, **Kannada (ಕನ್ನಡ)**, *English & Hindi*
+### 💰 5. Comprehensive Asset Tracking
+Manage liquidity across various modalities — cash, UPI, bank accounts, and credit cards.
+- Multi-wallet support with real-time balance tracking.
+- Inter-wallet transfers and automated balance adjustment.
 
-### 💰 6. Wallet & Account Tracking
-Track money across multiple wallets — cash, bank accounts, UPI, credit cards.
-- `/wallet cash 5000` — Create a wallet with an initial balance
-- `/balance` — View all wallet balances at a glance
-- `/transfer cash hdfc 3000` — Move money between wallets
-- Every expense auto-deducts from the correct wallet
+### 🤝 6. Lending & Debt Ledger
+A centralized system to manage social lending and borrowing.
+- Detailed records of outstanding debts and credits.
+- Instant overview of "who owes what" via `/debts`.
 
-### 🤝 7. Lending & Borrowing Ledger
-Never forget who owes whom.
-- `/lend John 500 dinner` — Record money you lent
-- `/borrow Sarah 1000 tickets` — Record money you borrowed
-- `/debts` — See all outstanding balances at a glance
+### 📄 7. Professional Financial Reporting
+Generate audit-ready PDF reports featuring interactive charts and comprehensive transaction tables.
+- Customizable timeframes (7-day, 30-day, or custom).
+- Visual category breakdowns and spending trends.
 
-### 📄 8. PDF Expense Reports
-Generate professional PDF reports with charts and transaction tables.
-- `/report` — Last 30 days (default)
-- `/report 7` — Last 7 days
-- Includes category breakdown bar chart + transaction table
-
-### 🌳 9. Hierarchical Spending Summary
-See your spending organized in a tree structure by parent category → subcategory.
-- `/treesummary` — Beautiful tree-formatted breakdown
-```
-├── Food — ₹3,200
-│   ├── Restaurants: ₹1,500
-│   ├── Fast Food: ₹800
-│   └── Groceries: ₹900
-├── Transport — ₹2,100
-│   ├── Travel: ₹1,400
-│   └── Transportation: ₹700
-└── Lifestyle — ₹749
-    └── Subscriptions: ₹749
-```
-
-### 📊 10. Professional Visualization & Insights
-- **In-Bot Charts:** Get instant Pie Charts directly in your Telegram chat via `/summary`.
-- **AI Insights:** Proactive advice based on spending patterns.
-- **Web Dashboard:** A real-time **Vite + React** command center with live data sync — every expense logged via the bot appears on the dashboard within seconds.
+### 📊 8. Real-time Analytics Dashboard
+A high-performance **Vite + React** command center that synchronizes instantly with the Telegram bot. View spending hierarchies, AI-driven insights, and interactive visualizations.
 
 ---
 
@@ -89,7 +64,6 @@ See your spending organized in a tree structure by parent category → subcatego
 ```mermaid
 graph TD
     A[User Input: Voice/Image/Text] --> B[Telegram Bot Backend]
-    P[Bank Data: Setu AA API] --> I
     B --> C{Processing Layer}
     C -->|Voice| D[Wispr/Whisper API]
     C -->|Image| E[GPT-4o Vision]
@@ -103,19 +77,26 @@ graph TD
     I --> L[Vite + React Dashboard]
     I --> M[API Server :8787]
     M --> L
+    
+    subgraph Future
+    P[Bank Data: Setu AA API] -.-> I
+    end
 ```
 
 ---
 
-## 🏗️ Development Division
-This project is built using a collaborative agent-based approach:
-- **Backend & Logic (This Repo):** Full Telegram Bot implementation, API integrations (Wispr, Setu, OpenAI), and Custom ML pipeline.
-- **UI/UX:** Specialized UI agent focused on the Web Dashboard and Visual Identity.
+## 🗺️ Roadmap & Future Enhancements
+
+- [ ] **Automated Banking Sync (Setu AA):** Full integration with the Setu Account Aggregator framework for secure, real-time access to Indian banking data (UPI Reconciliation & Vampire Payment Detection).
+- [ ] **Smart Budgeting:** Proactive alerts when approaching category-specific limits.
+- [ ] **Investment Tracking:** Integration with mutual fund and stock market APIs for a complete net-worth overview.
 
 ---
 
-## 🏷️ Supported Categories (23)
-`Bills & Utilities` • `Cash & ATM` • `Childcare` • `Coffee & Beverages` • `Convenience` • `Education` • `Entertainment` • `Fast Food` • `Food Delivery` • `Gas & Fuel` • `Giving` • `Groceries` • `Healthcare` • `Housing` • `Income` • `Insurance` • `Other` • `Restaurants` • `Shopping & Retail` • `Subscriptions` • `Transfers` • `Transportation` • `Travel`
+## 🏗️ Development Division
+This project utilizes a collaborative agent-driven architecture:
+- **Core Engine:** Backend logic, API orchestrations, and ML pipeline.
+- **Visual Identity:** Specialized UI/UX focus for the Web Dashboard and data visualization.
 
 ---
 
@@ -123,127 +104,47 @@ This project is built using a collaborative agent-based approach:
 
 | Command | Description |
 |---------|-------------|
-| `/start` | Start the assistant |
-| `/help` | Show all commands |
-| `/language` | Change bot language |
-| `/summary` | Spending summary with chart |
-| `/treesummary` | Hierarchical spending breakdown |
-| `/insights` | AI financial insights |
-| `/balance` | View wallet balances |
-| `/wallet <name> [amount]` | Add a new wallet |
-| `/transfer <from> <to> <amount>` | Transfer between wallets |
-| `/lend <person> <amount> [note]` | Record money lent |
-| `/borrow <person> <amount> [note]` | Record money borrowed |
-| `/debts` | View outstanding debts |
-| `/report [days]` | Generate PDF expense report |
-| `/subscriptions` | View recurring expenses |
-| `/setbudget <category> <amount>` | Set budget alerts |
-| `/export` | Download expenses as CSV |
-| `/stats` | View streaks and badges |
-| `/reminders` | Toggle smart reminders |
-| `/suggestions` | Spending suggestions per category |
-| `/dashboard` | Open the web dashboard |
+| `/start` | Initialize the assistant |
+| `/summary` | Visual spending summary with analytics |
+| `/insights` | AI-driven financial advice |
+| `/balance` | Current liquidity overview |
+| `/report` | Generate professional PDF report |
+| `/dashboard` | Access the web command center |
 
 ---
 
 ## ⚡ Quick Start
 
-### 1. Clone & Install
+### 1. Installation
 ```bash
 git clone https://github.com/Dawn-Fighter/finehance-omni.git
 cd finehance-omni
 pip install -r requirements.txt
 ```
 
-### 2. Configure Credentials
-Create a `.env` file in the root directory:
+### 2. Environment Setup
+Configure your `.env` file with the necessary API keys:
 ```env
-OPENAI_API_KEY=your_key_here
-LLM_MODEL=gpt-4o
-TELEGRAM_BOT_TOKEN=your_token_here
-HF_TOKEN=your_hf_token_here
-SETU_CLIENT_ID=your_setu_id
-SETU_CLIENT_SECRET=your_setu_secret
-SETU_PRODUCT_INSTANCE_ID=your_instance_id
-<div align="center">
-
-<?xml version="1.0" encoding="UTF-8"?>
-<svg xmlns="http://www.w3.org/2000/svg" xml:space="preserve" viewBox="0 0 304.8 304.8" style="shape-rendering:geometricPrecision; text-rendering:geometricPrecision; image-rendering:optimizeQuality; fill-rule:evenodd; clip-rule:evenodd">
- <path fill="#010101" d="M251.32 268.59l0.01 -94.92c4.33,-1.47 15.94,-9.98 19.4,-13.77 0.53,-0.58 1.07,-1.03 1.62,-1.61l6.18 -7.25c0.56,-0.76 0.89,-1.55 1.56,-1.94 -0.19,24.66 -0.02,49.43 0.01,74.1 0.02,12.33 -0.68,21.6 -6.85,30.18 -2.84,3.95 -5.16,6.58 -9.11,9.42 -2.96,2.13 -8.15,5.17 -12.82,5.79zm-121.63 -0.03c-0.27,-15.77 -0.03,-31.88 0.01,-47.68 0.05,-16.32 -0.31,-26.37 6.28,-41.58 8.52,-19.68 27.8,-37.59 55.01,-40.6 16.33,-1.8 27.99,2.53 41.59,-6.06 36.45,-23.04 2.98,-62.39 31.87,-87.79 3.75,-3.3 10.29,-7.59 15.62,-8.41 0.21,7.86 0.01,15.93 0.04,23.82 0.02,7.94 0.05,15.9 0.01,23.84 -0.03,7.95 0.2,15.38 -0.7,23.15 -1.81,15.46 -9.32,29.45 -19.69,40.03 -2.12,2.15 -3.91,3.65 -6.42,5.63 -9.55,7.51 -21.5,12.31 -34.21,13.7 -16.66,1.81 -27.89,-2.64 -41.64,6.03 -8.75,5.53 -16.96,14.98 -18.89,29.03 -2.01,14.74 2.04,31.04 -3.16,44.73 -2.25,5.93 -5.42,10.21 -9.66,14.19 -2.51,2.35 -11,7.92 -16.06,7.97zm-105.04 -112.98c-0.07,-11.72 -0.05,-23.43 -0.06,-35.15 -0.01,-8.29 -0.29,-27.57 0.42,-34.74 1.47,-15.01 7.28,-26.24 17.14,-35.63 9.98,-9.5 23.13,-14.56 37.97,-14.72 11.7,-0.12 23.47,-0.02 35.18,-0.02 23.35,0 46.72,-0.09 70.07,0 -0.31,3.2 -2.28,8.03 -3.68,10.55 -3.29,5.97 -8.36,10.82 -14.47,14 -8.88,4.61 -13.98,4.63 -23.91,4.6l-42.59 -0.01c-8.69,0 -19.2,-0.82 -26.77,1.66 -7.22,2.37 -12.79,7.09 -15.95,12.52 -4.62,7.95 -4.47,13.74 -4.47,23.97 0,4.79 0,9.57 0.01,14.35 0,4.12 0.35,10.22 -0.06,14.1 -5.74,2.7 -11.98,7.31 -16.07,10.78l-6.75 6.67c-1.09,1.23 -2.13,2.2 -3.15,3.56 -0.43,0.57 -2.38,3.23 -2.86,3.51zm-16.81 130.42c2.78,0.41 9.91,0.13 13.04,0.04 3.67,-0.1 8.04,-0.89 11.43,-1.88 7.05,-2.05 13.07,-5.34 17.68,-9.15 5.47,-4.53 8.9,-8.34 12.58,-14.28 8.95,-14.46 8.02,-28.86 8,-45.63 -0.01,-9.57 -0.55,-15.9 4.37,-22.54 9.63,-12.96 20.8,-6.95 36.75,-10.21 1.62,-0.34 3.93,-1.07 5.4,-1.22 -0.35,1.63 -0.94,3.54 -1.36,5.24 -0.45,1.78 -0.82,3.77 -1.24,5.7 -2.39,10.9 -1.66,27.82 -1.69,39.23 -0.01,4.17 -0.26,51.82 0.08,54.73 7.24,0.78 18.63,-0.06 25.62,-2.37 10.11,-3.34 16.96,-8.22 23.3,-15.58 7.8,-9.03 12.51,-20.81 13.18,-33.3 0.5,-9.29 -0.32,-18.94 0.15,-28.22 0.46,-8.9 4.64,-15.01 9.62,-18.75 9.31,-7 22.54,-2.96 37.75,-4.84 2.13,-0.27 4.12,-0.57 6.17,-0.98 1.56,-0.32 4.44,-1.26 5.77,-1.31l0.07 105.39c12.13,1.01 24.51,-0.67 34.67,-6.43 8.54,-4.85 15.55,-12.19 20.5,-20.7 6.46,-11.09 7.35,-21.29 7.36,-33.89l-0.01 -185.62c0,-6.81 0.26,-14.15 -0.03,-20.89 -19.46,-0.9 -35.29,4.15 -47.64,17.7 -5.46,5.99 -9.3,12.58 -11.99,20.65 -3.27,9.77 -2.86,18.78 -2.87,29.75 -0.01,12.21 1.16,18.93 -5.47,27.17 -14.32,17.82 -37.59,-3.37 -76.58,21.32 -7.22,4.58 -10.07,7.51 -15.75,12.72 -2.98,2.73 -4.58,4.85 -8.2,8 -3.9,3.39 -7.6,5.76 -12.75,7.84 -4.09,1.67 -8.28,2.71 -13.18,3.1 -9.12,0.74 -17.55,-1.27 -28.03,4.53 -1.88,1.04 -3.4,2.07 -4.92,3.19 -8.27,6.07 -13.53,15.03 -15.53,25.46 -0.87,4.5 -0.58,10.74 -0.59,15.59 -0.01,16.69 1.71,27.63 -8.42,40.64 -2.01,2.59 -5.56,5.83 -8.69,7.75 -2.44,1.5 -8.27,4.72 -11.76,4.55 -0.25,-9.9 0.02,-20.08 -0.01,-30.03 -0.03,-10.05 -0.18,-20.28 0,-30.32 0.22,-12.6 3.35,-25.42 9.42,-35.89 1.87,-3.23 3.96,-6.6 6.14,-9.14 5.58,-6.49 7.91,-8.94 15.79,-14.29 5.83,-3.95 13.38,-7.16 21.39,-8.92 9.24,-2.04 18.82,-1.59 28.68,-1.58 10.05,0.01 20.37,-0.24 30.37,0.03 0.39,-4.72 2.24,-12 2.06,-16.52 -11.68,-0.2 -23.5,0.02 -35.2,-0.01 -10.84,-0.02 -18.54,-0.49 -29.02,1.74 -1.17,0.26 -2.63,0.79 -3.66,0.88 0.01,-4.96 0.02,-9.93 0.01,-14.89 -0.02,-8.61 -1.64,-19.86 4.64,-25.02 3.3,-2.7 6.13,-3.36 11.59,-3.38 19.83,-0.07 39.66,0 59.48,-0.01 24.94,-0.02 45.27,-12.32 53.69,-35.48 1.36,-3.75 2.19,-7.85 2.59,-12.26 0.36,-4.05 0.4,-10.63 0.12,-14.75 -2.56,-0.39 -53.47,-0.1 -57.55,-0.11 -19.29,-0.02 -38.58,0.01 -57.86,-0.01 -18.94,-0.02 -30.6,1.67 -46.57,11.35 -11.45,6.94 -21.08,18.88 -26.76,31.11 -7.4,15.92 -6.21,32.5 -6.23,51.56l0 115.73c0.02,4.63 -0.25,54.74 0.1,57.71z"/>
-</svg> FineHance Omni
-### The Frictionless, Multimodal Financial Intelligence Ecosystem
-
-[![GitHub License](https://img.shields.io/badge/license-Apache%202.0-blue.svg)](LICENSE)
-[![Python 3.10+](https://img.shields.io/badge/python-3.10+-blue.svg)](https://www.python.org/downloads/)
-[![React 18](https://img.shields.io/badge/React-18-61DAFB.svg?logo=react)](https://reactjs.org/)
-[![Vite](https://img.shields.io/badge/Vite-4-646CFF.svg?logo=vite)](https://vitejs.dev/)
-[![Custom ML Accuracy](https://img.shields.io/badge/ML--Accuracy-96.56%25-green.svg)](https://huggingface.co/CyberKunju/finehance-categorizer-minilm)
-
-*FineHance Omni* is a next-generation financial assistant designed to completely eliminate the friction of expense tracking. By uniting *Voice Automation, **Receipt Vision, a **Custom Transformer Model, **Setu Open Banking, and a **Stunning Modern Web Dashboard*, it captures every rupee of your spending with zero effort and provides proactive, professional-grade financial insights.
-
-[Explore the Custom ML Model](https://huggingface.co/CyberKunju/finehance-categorizer-minilm) • [Report Bug](https://github.com/Dawn-Fighter/finehance-omni/issues) • [Request Feature](https://github.com/Dawn-Fighter/finehance-omni/issues)
-
-</div>
-
-## 🚀 Key Features
-
-### 🎙️ 1. Voice-to-Finance (Powered by Wispr)
-Don't type. Just say: *"Hey, I just spent 1200 on petrol at Shell."* 
-FineHance Omni transcribes the audio, extracts the amount, and uses a specialized model to categorize it in milliseconds.
-
-### 👁️ 2. Receipt Vision (GPT-4o)
-Snap a photo of any thermal receipt or invoice. The system itemizes the entire purchase, extracting:
-- Individual line items
-- Total amount & Taxes
-- Merchant name & Date
-
-### 🧠 3. Custom ML Categorization
-Unlike generic trackers, we use a specialized, fine-tuned **MiniLM-L6 Transformer** model:
-- **Model:** `CyberKunju/finehance-categorizer-minilm`
-- **Precision:** **96.56% Accuracy** across 23 distinct financial categories.
-- **Latency:** Ultra-fast inference (~6,600 samples/sec).
-
-### 🏦 4. Automated Indian Bank Sync (Setu)
-Powered by the **Setu Account Aggregator** framework.
-- **UPI Integration:** Automatically pulls transactions from HDFC, SBI, ICICI, etc.
-- **Real-time Reconciliation:** Matches manual logs with bank-direct transactions.
-- **Subscription Detection:** Identifies recurring "vampire" payments automatically.
-
-### 🌍 5. South Indian Multilingual Support
-Talk to the bot in your native language. We support:
-- **Malayalam (മലയാളം)**, **Tamil (தமிழ்)**, **Telugu (తెలుగు)**, **Kannada (ಕನ್ನಡ)**, *English & Hindi*
-
-### 💰 6. Wallet & Account Tracking
-Track money across multiple wallets — cash, bank accounts, UPI, credit cards.
-- `/wallet cash 5000` — Create a wallet with an initial balance
-- `/balance` — View all wallet balances at a glance
-
+OPENAI_API_KEY=...
+TELEGRAM_BOT_TOKEN=...
+HF_TOKEN=...
 ```
 
-### 3. Run the Ecosystem
-**Start the Bot Backend:**
-```bash
-python bot/bot.py
-```
-**Start the API Server (for dashboard):**
-```bash
-python bot/api_server.py
-```
-**Start the Dashboard:**
-```bash
-cd frontend && npm install && npx vite
-```
+### 3. Execution
+**Backend:** `python bot/bot.py`  
+**API Server:** `python bot/api_server.py`  
+**Dashboard:** `cd frontend && npm install && npx vite`
 
 ---
 
-## 🏆 Hackathon Context
-**FineHance Omni** was conceptualized, built, and deployed in **8 hours**. It demonstrates the power of combining specialized custom ML models with multimodal LLM capabilities and Indian financial APIs (Setu) to solve a real-world utility problem.
+## 🏆 Achievement: VVCE Hackathon
+**FineHance Omni** was conceptualized, developed, and deployed in just **8 hours**, securing **1st Place in Track 1** at the VVCE Hackathon. It stands as a testament to the power of specialized ML models and multimodal AI in solving complex real-world challenges.
 
 ---
 
-## 👨‍💻 Authors
-**Kashyap Dayal**  
-**Navaneeth K (CyberKunju)**  
-**Chethas Dileep**
+## 👥 Authors (Team Requiem)
+- **Kashyap Dayal**
+- **Navaneeth K (CyberKunju)**
+- **Chethas Dileep**
 
 [Hugging Face Profile](https://huggingface.co/CyberKunju) | [GitHub](https://github.com/Dawn-Fighter)
