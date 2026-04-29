@@ -1,7 +1,7 @@
 <div align="center">
 
 # Requiem: FineHance Omni
-### 🏆 **1st Place Winner (Track 1) — Vibe Athon**
+### 🏆 **1st Place Winner (Track 1) — Vibeathon**
 **Vidyavardhaka College of Engineering, Mysore**
 
 [![GitHub License](https://img.shields.io/badge/license-Apache%202.0-blue.svg)](LICENSE)
@@ -138,8 +138,8 @@ HF_TOKEN=...
 
 ---
 
-## 🏆 Achievement: Vibe Athon (VVCE)
-**FineHance Omni** was conceptualized, developed, and deployed in just **8 hours**, securing **1st Place in Track 1** at **Vibe Athon**, Vidyavardhaka College of Engineering. It stands as a testament to the power of specialized ML models and multimodal AI in solving complex real-world challenges.
+## 🏆 Achievement: Vibeathon (VVCE)
+**FineHance Omni** was conceptualized, developed, and deployed in just **8 hours**, securing **1st Place in Track 1** at **Vibeathon**, Vidyavardhaka College of Engineering. It stands as a testament to the power of specialized ML models and multimodal AI in solving complex real-world challenges.
 
 ---
 
